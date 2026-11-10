@@ -7,21 +7,17 @@ import {
   Modal,
   TouchableWithoutFeedback,
   ScrollView,
-  Platform,
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Palette } from '../constants/theme';
+import { Palette, Radius, Typography } from '../constants/theme';
 
 export type DrawerMenuKey =
-  | 'Partners'
-  | 'Maintenance'
   | 'Deposits'
-  | 'Payments'
   | 'Reports'
   | 'Settings'
-  | 'Account';
+  | 'Profile';
 
 interface HamburgerDrawerProps {
   visible: boolean;
@@ -40,28 +36,10 @@ interface MenuItemConfig {
 
 const PRIMARY_MENU_ITEMS: MenuItemConfig[] = [
   {
-    key: 'Partners',
-    label: 'Partners',
-    subtitle: 'Shares and payouts',
-    icon: 'users',
-  },
-  {
-    key: 'Maintenance',
-    label: 'Maintenance',
-    subtitle: 'Repair requests',
-    icon: 'tool',
-  },
-  {
     key: 'Deposits',
     label: 'Deposits',
     subtitle: 'Held and refunds',
     icon: 'lock',
-  },
-  {
-    key: 'Payments',
-    label: 'Payments',
-    subtitle: 'Rent and transactions',
-    icon: 'credit-card',
   },
   {
     key: 'Reports',
@@ -72,7 +50,7 @@ const PRIMARY_MENU_ITEMS: MenuItemConfig[] = [
   {
     key: 'Settings',
     label: 'Settings',
-    subtitle: 'Account and apartment',
+    subtitle: 'Floors, rooms & rental rules',
     icon: 'settings',
   },
 ];
@@ -124,7 +102,7 @@ export default function HamburgerDrawer({
               style={styles.closeSquareButton}
               activeOpacity={0.7}
             >
-              <Feather name="x" size={18} color={Palette.surface} />
+              <Feather name="x" size={Typography.iconSize.base} color={Palette.onPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -151,30 +129,30 @@ export default function HamburgerDrawer({
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
-                <Feather name="chevron-right" size={18} color={Palette.secondary} />
+                <Feather name="chevron-right" size={Typography.iconSize.base} color={Palette.primary} />
               </TouchableOpacity>
             ))}
 
             {/* Divider */}
             <View style={styles.menuDivider} />
 
-            {/* Account Section Header */}
-            <Text style={styles.accountHeader}>ACCOUNT</Text>
+            {/* Profile Section Header */}
+            <Text style={styles.accountHeader}>PROFILE</Text>
 
-            {/* Account Item */}
+            {/* Profile Item */}
             <TouchableOpacity
               style={styles.menuRow}
-              onPress={() => handleItemPress('Account')}
+              onPress={() => handleItemPress('Profile')}
               activeOpacity={0.7}
             >
               <View style={styles.iconCol}>
-                <Feather name="user" size={20} color={Palette.primary} />
+                <Feather name="user" size={Typography.iconSize.base} color={Palette.primary} />
               </View>
               <View style={styles.textCol}>
-                <Text style={styles.menuLabel}>Account & Profile</Text>
-                <Text style={styles.menuSubtitle}>Profile and preferences</Text>
+                <Text style={styles.menuLabel}>Profile</Text>
+                <Text style={styles.menuSubtitle}>Personal details & security</Text>
               </View>
-              <Feather name="chevron-right" size={18} color={Palette.secondary} />
+              <Feather name="chevron-right" size={Typography.iconSize.base} color={Palette.primary} />
             </TouchableOpacity>
 
             {/* Logout Button */}
@@ -186,7 +164,7 @@ export default function HamburgerDrawer({
               }}
               activeOpacity={0.85}
             >
-              <Feather name="log-out" size={18} color={Palette.surface} style={styles.logoutIcon} />
+              <Feather name="log-out" size={Typography.iconSize.base} color={Palette.onPrimary} style={styles.logoutIcon} />
               <Text style={styles.logoutText}>Logout</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -207,7 +185,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(46, 39, 34, 0.45)',
+    backgroundColor: Palette.backdrop,
   },
   drawerPanel: {
     width: '84%',
@@ -238,21 +216,17 @@ const styles = StyleSheet.create({
     height: 26,
   },
   brandTitle: {
-    fontSize: 24,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '700',
-    color: Palette.surface,
+    color: Palette.onPrimary,
     marginLeft: 10,
     letterSpacing: 0.5,
-    ...Platform.select({
-      ios: { fontFamily: 'Georgia' },
-      android: { fontFamily: 'serif' },
-      default: { fontFamily: 'serif' },
-    }),
+    fontFamily: Typography.fontFamily.serif,
   },
   closeSquareButton: {
     width: 34,
     height: 34,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -274,20 +248,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   iconCol: {
-    width: 36,
-    alignItems: 'flex-start',
+    width: 38,
+    height: 38,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.iconBg,
+    alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
   },
   textCol: {
     flex: 1,
   },
   menuLabel: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
     color: Palette.text,
   },
   menuSubtitle: {
-    fontSize: 12.5,
+    fontSize: Typography.fontSize.xs,
     color: Palette.textSecondary,
     marginTop: 2,
   },
@@ -298,7 +276,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   accountHeader: {
-    fontSize: 11,
+    fontSize: Typography.fontSize.caption,
     fontWeight: '700',
     color: Palette.primary,
     letterSpacing: 0.8,
@@ -310,7 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Palette.primary,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     paddingVertical: 13,
     marginTop: 20,
   },
@@ -318,8 +296,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   logoutText: {
-    color: Palette.surface,
-    fontSize: 15,
+    color: Palette.onPrimary,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
   },
 });

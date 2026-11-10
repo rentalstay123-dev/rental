@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import LuvoraLogo from '../components/LuvoraLogo';
-import { Palette } from '../constants/theme';
+import { Palette, Radius, Typography } from '../constants/theme';
 
 interface LoadingScreenProps {
   onFinish?: () => void;
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 5,
     backgroundColor: Palette.border,
-    borderRadius: 3,
+    borderRadius: Radius.xs,
     overflow: 'hidden',
     marginTop: 24,
     marginBottom: 14,
@@ -138,10 +138,10 @@ const styles = StyleSheet.create({
   progressBarFill: {
     height: '100%',
     backgroundColor: Palette.primary,
-    borderRadius: 3,
+    borderRadius: Radius.xs,
   },
   loadingText: {
-    fontSize: 12.5,
+    fontSize: Typography.fontSize.xs,
     color: Palette.textSecondary,
     letterSpacing: 2,
     fontWeight: '500',

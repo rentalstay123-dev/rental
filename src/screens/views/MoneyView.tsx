@@ -14,7 +14,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Palette } from '../../constants/theme';
+import { Palette, Radius, Typography } from '../../constants/theme';
 
 interface MoneyViewProps {
   onBack?: () => void;
@@ -105,14 +105,15 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
 
   return (
     <ScrollView
+      style={{ flex: 1 }}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.container}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#000000"
-          colors={['#000000']}
+          tintColor={Palette.accentText}
+          colors={[Palette.accentText]}
         />
       }
     >
@@ -124,7 +125,7 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
           activeOpacity={0.7}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Feather name="chevron-left" size={22} color={Palette.text} />
+          <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Accounts</Text>
       </View>
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 110,
+    paddingBottom: 24,
     backgroundColor: Palette.background,
   },
   headerRow: {
@@ -354,8 +355,8 @@ const styles = StyleSheet.create({
   backButtonCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: Palette.surface,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -363,7 +364,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.border,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '700',
     color: Palette.text,
     letterSpacing: 0.3,
@@ -381,37 +382,37 @@ const styles = StyleSheet.create({
   summaryCard: {
     width: '48.5%',
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: Radius.md,
     padding: 16,
     borderWidth: 1,
     borderColor: Palette.border,
     overflow: 'hidden',
   },
   summaryLabel: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '500',
     marginBottom: 6,
   },
   summaryValue: {
-    fontSize: 24,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '800',
-    color: Palette.primary,
+    color: Palette.accentText,
     marginBottom: 4,
   },
   summarySub: {
-    fontSize: 12.5,
+    fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
   },
   caramelIndicator: {
     height: 3,
-    backgroundColor: Palette.secondary,
-    borderRadius: 1.5,
+    backgroundColor: Palette.primary,
+    borderRadius: Radius.xs,
     marginTop: 10,
     width: '40%',
   },
   sectionHeading: {
-    fontSize: 19,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     color: Palette.text,
     marginBottom: 12,
@@ -428,16 +429,16 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
   },
   addButtonText: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
     fontWeight: '700',
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
   },
   cardContainer: {
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: Radius.md,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderWidth: 1,
@@ -453,23 +454,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
     color: Palette.text,
     marginBottom: 3,
   },
   itemSubtitle: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
   },
   itemAmount: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.md,
     fontWeight: '800',
     color: Palette.text,
   },
   divider: {
     height: 1,
-    backgroundColor: Palette.border,
+    backgroundColor: Palette.divider,
   },
   modalOverlay: {
     flex: 1,
@@ -481,12 +482,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(46, 39, 34, 0.45)',
+    backgroundColor: Palette.backdrop,
   },
   modalContent: {
     backgroundColor: Palette.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: Radius.md,
+    borderTopRightRadius: Radius.md,
     borderTopWidth: 1,
     borderColor: Palette.border,
     paddingHorizontal: 22,
@@ -500,12 +501,12 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '700',
     color: Palette.text,
   },
   inputLabel: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '600',
     color: Palette.text,
     marginBottom: 6,
@@ -515,22 +516,22 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: Palette.text,
   },
   saveExpenseBtn: {
     backgroundColor: Palette.primary,
-    borderRadius: 12,
+    borderRadius: Radius.sm,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 18,
   },
   saveExpenseBtnText: {
-    color: Palette.surface,
-    fontSize: 16,
+    color: Palette.onPrimary,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
   },
 });

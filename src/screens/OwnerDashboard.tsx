@@ -4,24 +4,21 @@ import {
   Text,
   View,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Palette } from '../constants/theme';
+import { StatusBar } from 'expo-status-bar';
+import { Feather } from '@expo/vector-icons';
+import { Palette, Radius, Typography } from '../constants/theme';
 import HamburgerDrawer, { DrawerMenuKey } from '../components/HamburgerDrawer';
 import DashboardView from './views/DashboardView';
-import RoomsView, { INITIAL_ROOMS, RoomItem } from './views/RoomsView';
-import RentView from './views/RentView';
+import RoomsView, { INITIAL_FLOORS, INITIAL_ROOMS, RoomItem } from './views/RoomsView';
+import RentView, { RentFilter } from './views/RentView';
 import MoneyView from './views/MoneyView';
-import PartnersView from './views/PartnersView';
-import MaintenanceView from './views/MaintenanceView';
 import DepositsView from './views/DepositsView';
 import TenantsView from './views/TenantsView';
 import ReportsView from './views/ReportsView';
-import SettingsView, { INITIAL_APARTMENTS, ApartmentItem, INITIAL_MAINTENANCE_REASONS } from './views/SettingsView';
-import AccountView from './views/AccountView';
-import PaymentsView from './views/PaymentsView';
+import SettingsView, { INITIAL_MAINTENANCE_REASONS, INITIAL_ROOM_TYPES } from './views/SettingsView';
+import ProfileView from './views/AccountView';
 import NotificationsView from './views/NotificationsView';
 
 export type ActivePage =
@@ -29,14 +26,11 @@ export type ActivePage =
   | 'Rooms'
   | 'Rent'
   | 'Accounts'
-  | 'Partners'
-  | 'Maintenance'
   | 'Deposits'
   | 'Residents'
   | 'Reports'
   | 'Settings'
-  | 'Account'
-  | 'Payments'
+  | 'Profile'
   | 'Notifications';
 
 interface OwnerDashboardProps {
@@ -48,24 +42,18 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
   const insets = useSafeAreaInsets();
   const [activePage, setActivePage] = useState<ActivePage>('Home');
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | undefined>(undefined);
+  const [rentFilter, setRentFilter] = useState<RentFilter>('All');
+  const [rentViewKey, setRentViewKey] = useState(0);
   const [rooms, setRooms] = useState<RoomItem[]>(INITIAL_ROOMS);
-  const [apartments, setApartments] = useState<ApartmentItem[]>(INITIAL_APARTMENTS);
   const [maintenanceReasons, setMaintenanceReasons] = useState<string[]>(INITIAL_MAINTENANCE_REASONS);
+  const [roomTypes, setRoomTypes] = useState<string[]>(INITIAL_ROOM_TYPES);
+  const [floors, setFloors] = useState<string[]>(INITIAL_FLOORS);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const handleMenuSelect = (key: DrawerMenuKey) => {
     switch (key) {
-      case 'Partners':
-        setActivePage('Partners');
-        break;
-      case 'Maintenance':
-        setActivePage('Maintenance');
-        break;
       case 'Deposits':
         setActivePage('Deposits');
-        break;
-      case 'Payments':
-        setActivePage('Payments');
         break;
       case 'Reports':
         setActivePage('Reports');
@@ -73,8 +61,8 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
       case 'Settings':
         setActivePage('Settings');
         break;
-      case 'Account':
-        setActivePage('Account');
+      case 'Profile':
+        setActivePage('Profile');
         break;
       default:
         break;
@@ -88,56 +76,50 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
           <RoomsView
             rooms={rooms}
             setRooms={setRooms}
+            roomTypes={roomTypes}
+            floors={floors}
             onBack={() => setActivePage('Home')}
           />
         );
       case 'Rent':
-        return <RentView onBack={() => setActivePage('Home')} />;
+        return (
+          <RentView
+            key={rentViewKey}
+            initialFilter={rentFilter}
+            onBack={() => setActivePage('Home')}
+          />
+        );
       case 'Accounts':
         return <MoneyView onBack={() => setActivePage('Home')} />;
-      case 'Partners':
-        return (
-          <PartnersView
-            apartments={apartments}
-            onBack={() => setActivePage('Home')}
-          />
-        );
-      case 'Maintenance':
-        return (
-          <MaintenanceView
-            rooms={rooms}
-            maintenanceReasons={maintenanceReasons}
-            onBack={() => setActivePage('Home')}
-          />
-        );
       case 'Deposits':
-        return <DepositsView onBack={() => setActivePage('Home')} />;
+        return <DepositsView rooms={rooms} onBack={() => setActivePage('Home')} />;
       case 'Residents':
         return <TenantsView onBack={() => setActivePage('Home')} />;
       case 'Reports':
-        return <ReportsView onBack={() => setActivePage('Home')} />;
+        return <ReportsView rooms={rooms} onBack={() => setActivePage('Home')} />;
       case 'Settings':
         return (
           <SettingsView
             rooms={rooms}
-            onAddRoom={(newRoom) => setRooms((prev) => [newRoom, ...prev])}
-            apartments={apartments}
-            setApartments={setApartments}
+            onAddRoom={(newRoom) => setRooms((prev) => [...prev, newRoom])}
+            onAddRooms={(newRooms) => setRooms((prev) => [...prev, ...newRooms])}
             maintenanceReasons={maintenanceReasons}
             setMaintenanceReasons={setMaintenanceReasons}
+            roomTypes={roomTypes}
+            setRoomTypes={setRoomTypes}
+            floors={floors}
+            setFloors={setFloors}
             onBack={() => setActivePage('Home')}
           />
         );
-      case 'Account':
+      case 'Profile':
         return (
-          <AccountView
+          <ProfileView
             userEmail={userEmail}
             onBack={() => setActivePage('Home')}
             onLogout={onLogout}
           />
         );
-      case 'Payments':
-        return <PaymentsView onBack={() => setActivePage('Home')} />;
       case 'Notifications':
         return (
           <NotificationsView
@@ -149,10 +131,13 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
       default:
         return (
           <DashboardView
-            onNavigatePage={(page, noticeId) => {
+            onNavigatePage={(page, noticeId, nextRentFilter) => {
               if (page === 'Rooms') setActivePage('Rooms');
-              else if (page === 'Rent') setActivePage('Rent');
-              else if (page === 'Money' || page === 'Accounts') setActivePage('Accounts');
+              else if (page === 'Rent') {
+                setRentFilter(nextRentFilter ?? 'All');
+                setRentViewKey((k) => k + 1);
+                setActivePage('Rent');
+              } else if (page === 'Money' || page === 'Accounts') setActivePage('Accounts');
               else if (page === 'Notifications') {
                 setSelectedNoticeId(noticeId);
                 setActivePage('Notifications');
@@ -163,57 +148,61 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
     }
   };
 
-  const isSubPage = activePage !== 'Home';
-
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      {/* Top Header shown on Home */}
-      {!isSubPage && (
-        <View style={styles.topHeader}>
-          <TouchableOpacity
-            onPress={() => setIsDrawerOpen(true)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={styles.headerIconButton}
-            activeOpacity={0.7}
-          >
-            <Feather name="menu" size={24} color={Palette.text} />
-          </TouchableOpacity>
+    <View style={styles.screen}>
+      <StatusBar style="light" />
 
-          {/* Luvora Wordmark (Brand Name Only) */}
-          <View style={styles.headerBrandContainer}>
-            <Text style={styles.headerLogoText}>Luvora</Text>
-          </View>
+      {/* Global Top Header shown across all pages */}
+      <View style={[styles.topHeader, { paddingTop: Math.max(insets.top, 12) }]}>
+        <TouchableOpacity
+          onPress={() => setIsDrawerOpen(true)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.headerIconButton}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
+          <Feather name="menu" size={Typography.iconSize.base} color={Palette.onPrimary} />
+        </TouchableOpacity>
 
-          {/* Notification Bell */}
-          <TouchableOpacity
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={styles.headerIconButton}
-            activeOpacity={0.7}
-            onPress={() => {
-              setSelectedNoticeId(undefined);
-              setActivePage('Notifications');
-            }}
-          >
-            <Feather name="bell" size={22} color={Palette.text} />
-          </TouchableOpacity>
+        {/* Luvora Wordmark (Brand Name Only) */}
+        <View style={styles.headerBrandContainer}>
+          <Text style={styles.headerLogoText}>Luvora</Text>
         </View>
-      )}
+
+        {/* Notification Bell */}
+        <TouchableOpacity
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={styles.headerIconButton}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+          onPress={() => {
+            setSelectedNoticeId(undefined);
+            setActivePage('Notifications');
+          }}
+        >
+          <Feather name="bell" size={Typography.iconSize.base} color={Palette.onPrimary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Main View Area */}
       <View style={styles.contentContainer}>{renderActiveView()}</View>
 
-      {/* Floating Bottom Navigation Bar (4-Tab Pill: Home, Rooms, Rent, Income & Exp) */}
+      {/* Floating Bottom Navigation Bar (4-Tab Pill: Home, Rooms, Rent, Accounts) */}
       <View style={[styles.floatingNavWrapper, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <View style={styles.floatingNavBar}>
+        <View style={styles.floatingNavBar} accessibilityRole="tablist">
           {/* Tab 1: Home */}
           <TouchableOpacity
             style={[styles.navTab, activePage === 'Home' && styles.navTabActive]}
             onPress={() => setActivePage('Home')}
             activeOpacity={0.85}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activePage === 'Home' }}
           >
             <Feather
               name="home"
-              size={19}
+              size={Typography.iconSize.base}
               color={activePage === 'Home' ? Palette.surface : Palette.textSecondary}
             />
             <Text
@@ -231,10 +220,12 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
             style={[styles.navTab, activePage === 'Rooms' && styles.navTabActive]}
             onPress={() => setActivePage('Rooms')}
             activeOpacity={0.85}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activePage === 'Rooms' }}
           >
-            <MaterialCommunityIcons
-              name="door-open"
-              size={20}
+            <Feather
+              name="grid"
+              size={Typography.iconSize.base}
               color={activePage === 'Rooms' ? Palette.surface : Palette.textSecondary}
             />
             <Text
@@ -250,12 +241,18 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
           {/* Tab 3: Rent */}
           <TouchableOpacity
             style={[styles.navTab, activePage === 'Rent' && styles.navTabActive]}
-            onPress={() => setActivePage('Rent')}
+            onPress={() => {
+              setRentFilter('All');
+              setRentViewKey((k) => k + 1);
+              setActivePage('Rent');
+            }}
             activeOpacity={0.85}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activePage === 'Rent' }}
           >
             <Feather
               name="credit-card"
-              size={18}
+              size={Typography.iconSize.base}
               color={activePage === 'Rent' ? Palette.surface : Palette.textSecondary}
             />
             <Text
@@ -273,10 +270,12 @@ export default function OwnerDashboard({ onLogout, userEmail }: OwnerDashboardPr
             style={[styles.navTab, activePage === 'Accounts' && styles.navTabActive]}
             onPress={() => setActivePage('Accounts')}
             activeOpacity={0.85}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activePage === 'Accounts' }}
           >
             <Feather
               name="dollar-sign"
-              size={19}
+              size={Typography.iconSize.base}
               color={
                 activePage === 'Accounts' ? Palette.surface : Palette.textSecondary
               }
@@ -317,10 +316,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    paddingVertical: 12,
-    backgroundColor: Palette.background,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
+    paddingBottom: 12,
+    backgroundColor: Palette.primary,
   },
   headerIconButton: {
     width: 40,
@@ -333,34 +330,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerLogoText: {
-    fontSize: 26,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '800',
-    color: Palette.text,
+    color: Palette.onPrimary,
     letterSpacing: 0.5,
-    ...Platform.select({
-      ios: { fontFamily: 'Georgia' },
-      android: { fontFamily: 'serif' },
-      default: { fontFamily: 'serif' },
-    }),
+    fontFamily: Typography.fontFamily.serif,
   },
   contentContainer: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: Palette.background,
   },
   floatingNavWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     paddingHorizontal: 20,
-    backgroundColor: 'transparent',
+    paddingTop: 8,
+    backgroundColor: Palette.background,
     alignItems: 'center',
   },
   floatingNavBar: {
     width: '100%',
     flexDirection: 'row',
     backgroundColor: Palette.surface,
-    borderRadius: 36,
+    borderRadius: Radius.pill,
     paddingVertical: 6,
     paddingHorizontal: 8,
     justifyContent: 'space-between',
@@ -373,14 +364,14 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 24,
+    borderRadius: Radius.pill,
     paddingHorizontal: 2,
   },
   navTabActive: {
     backgroundColor: Palette.primary,
   },
   navLabel: {
-    fontSize: 10.5,
+    fontSize: Typography.fontSize.caption,
     marginTop: 2,
   },
   navLabelActive: {

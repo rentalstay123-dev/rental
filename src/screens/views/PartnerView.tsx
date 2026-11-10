@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Palette } from '../../constants/theme';
+import { Palette, Radius } from '../../constants/theme';
 
 interface PartnerAgency {
   id: string;
@@ -72,7 +72,7 @@ export default function PartnerView() {
           activeOpacity={0.8}
           onPress={() => Alert.alert('Add Partner', 'Register new partner agency')}
         >
-          <Feather name="user-plus" size={17} color={Palette.surface} />
+          <Feather name="user-plus" size={17} color={Palette.onPrimary} />
           <Text style={styles.addButtonText}>Add Partner</Text>
         </TouchableOpacity>
       </View>
@@ -98,7 +98,7 @@ export default function PartnerView() {
         <View key={partner.id} style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.agencyIcon}>
-              <MaterialCommunityIcons name="office-building" size={24} color={Palette.primary} />
+              <MaterialCommunityIcons name="office-building" size={24} color={Palette.accentText} />
             </View>
             <View style={styles.agencyDetails}>
               <Text style={styles.agencyName}>{partner.name}</Text>
@@ -133,7 +133,7 @@ export default function PartnerView() {
           </View>
 
           <View style={styles.perfRow}>
-            <Feather name="award" size={14} color={Palette.primary} />
+            <Feather name="award" size={14} color={Palette.accentText} />
             <Text style={styles.perfText}>{partner.performance}</Text>
           </View>
 
@@ -142,7 +142,7 @@ export default function PartnerView() {
               style={styles.actionBtnOutline}
               onPress={() => Alert.alert('Contact', `Calling ${partner.contactPerson} (${partner.phone})`)}
             >
-              <Feather name="phone" size={14} color={Palette.text} style={{ marginRight: 6 }} />
+              <Feather name="phone" size={14} color={Palette.primary} style={{ marginRight: 6 }} />
               <Text style={styles.actionBtnOutlineText}>Call</Text>
             </TouchableOpacity>
 
@@ -150,7 +150,7 @@ export default function PartnerView() {
               style={styles.actionBtnOutline}
               onPress={() => Alert.alert('Email', `Emailing ${partner.email}`)}
             >
-              <Feather name="mail" size={14} color={Palette.text} style={{ marginRight: 6 }} />
+              <Feather name="mail" size={14} color={Palette.primary} style={{ marginRight: 6 }} />
               <Text style={styles.actionBtnOutlineText}>Email</Text>
             </TouchableOpacity>
 
@@ -196,10 +196,10 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
   },
   addButtonText: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
     fontWeight: '700',
     fontSize: 13,
     marginLeft: 6,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   statBox: {
     flex: 1,
     backgroundColor: Palette.surface,
-    borderRadius: 12,
+    borderRadius: Radius.sm,
     padding: 12,
     alignItems: 'center',
     marginHorizontal: 4,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Palette.surface,
-    borderRadius: 14,
+    borderRadius: Radius.md,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
@@ -245,8 +245,8 @@ const styles = StyleSheet.create({
   agencyIcon: {
     width: 44,
     height: 44,
-    borderRadius: 10,
-    backgroundColor: Palette.background,
+    borderRadius: Radius.sm,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: Radius.sm,
   },
   activeBadge: {
     backgroundColor: Palette.status.active.bg,
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   gridInfo: {
     flexDirection: 'row',
     backgroundColor: Palette.background,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     padding: 12,
     marginTop: 14,
     borderWidth: 1,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   perfText: {
     fontSize: 12,
-    color: Palette.primary,
+    color: Palette.accentText,
     fontWeight: '600',
     marginLeft: 6,
   },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     paddingVertical: 8,
     marginRight: 8,
     backgroundColor: Palette.surface,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   actionBtnFilled: {
     flex: 1.2,
     backgroundColor: Palette.primary,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
@@ -356,6 +356,6 @@ const styles = StyleSheet.create({
   actionBtnFilledText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Palette.surface,
+    color: Palette.onPrimary,
   },
 });

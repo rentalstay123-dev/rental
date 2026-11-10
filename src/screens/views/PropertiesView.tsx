@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Palette } from '../../constants/theme';
+import { Palette, Radius } from '../../constants/theme';
 
 interface PropertyItem {
   id: string;
@@ -95,7 +95,7 @@ export default function PropertiesView() {
           activeOpacity={0.8}
           onPress={() => Alert.alert('Add Property', 'Open Add Property modal.')}
         >
-          <Feather name="plus" size={18} color={Palette.surface} />
+          <Feather name="plus" size={18} color={Palette.onPrimary} />
           <Text style={styles.addButtonText}>Add Unit</Text>
         </TouchableOpacity>
       </View>
@@ -198,7 +198,7 @@ export default function PropertiesView() {
                 style={styles.cardBtnPrimary}
                 onPress={() => Alert.alert('Contact', `Contacting for ${prop.name}`)}
               >
-                <Feather name="phone" size={14} color={Palette.surface} style={{ marginRight: 6 }} />
+                <Feather name="phone" size={14} color={Palette.onPrimary} style={{ marginRight: 6 }} />
                 <Text style={styles.cardBtnPrimaryText}>
                   {prop.status === 'Occupied' ? 'Contact Resident' : 'List on Market'}
                 </Text>
@@ -240,10 +240,10 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
   },
   addButtonText: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
     fontWeight: '700',
     fontSize: 13,
     marginLeft: 4,
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Palette.surface,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Palette.border,
     paddingHorizontal: 12,
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: Radius.pill,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -290,11 +290,11 @@ const styles = StyleSheet.create({
     color: Palette.text,
   },
   filterTextActive: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
   },
   card: {
     backgroundColor: Palette.surface,
-    borderRadius: 14,
+    borderRadius: Radius.md,
     overflow: 'hidden',
     marginBottom: 16,
     borderWidth: 1,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: Radius.sm,
   },
   occupiedBadge: {
     backgroundColor: Palette.status.active.bg,
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.border,
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     marginRight: 8,
     backgroundColor: Palette.surface,
@@ -409,13 +409,13 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     flexDirection: 'row',
     paddingVertical: 9,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardBtnPrimaryText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Palette.surface,
+    color: Palette.onPrimary,
   },
 });

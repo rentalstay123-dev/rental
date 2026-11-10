@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
-import { Palette } from '../constants/theme';
+import { Palette, Typography } from '../constants/theme';
 
 interface PropertyStatusDonutProps {
   total?: number;
@@ -42,12 +42,12 @@ export default function PropertyStatusDonut({
             strokeDashoffset={-occupiedStroke}
             strokeLinecap="round"
           />
-          {/* Occupied Segment (Caramel / Coffee Brown) */}
+          {/* Occupied Segment (Primary Brand Indigo) */}
           <Circle
             cx={size / 2}
             cy={size / 2}
             r={radius}
-            stroke={Palette.secondary}
+            stroke={Palette.primary}
             strokeWidth={strokeWidth}
             fill="transparent"
             strokeDasharray={`${occupiedStroke} ${circumference}`}
@@ -79,13 +79,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   centerNumber: {
-    fontSize: 24,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
     color: Palette.text,
     lineHeight: 28,
   },
   centerLabel: {
-    fontSize: 11,
+    fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
     fontWeight: '500',
   },

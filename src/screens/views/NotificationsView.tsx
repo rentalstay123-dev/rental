@@ -9,8 +9,8 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Palette } from '../../constants/theme';
+import { Feather } from '@expo/vector-icons';
+import { Palette, Radius, Typography } from '../../constants/theme';
 
 export interface NotificationItem {
   id: string;
@@ -159,14 +159,15 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
   return (
     <View style={styles.outerScreen}>
       <ScrollView
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#000000"
-            colors={['#000000']}
+            tintColor={Palette.accentText}
+            colors={[Palette.accentText]}
           />
         }
       >
@@ -179,7 +180,7 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="chevron-left" size={22} color={Palette.text} />
+              <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Notifications</Text>
           </View>
@@ -215,7 +216,7 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
         {/* Notices List */}
         {filteredNotices.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Feather name="bell" size={38} color={Palette.textMuted} style={{ marginBottom: 12 }} />
+            <Feather name="bell" size={Typography.iconSize.lg} color={Palette.primary} style={{ marginBottom: 12 }} />
             <Text style={styles.emptyTitle}>No notifications</Text>
             <Text style={styles.emptySub}>All caught up! New updates will appear here.</Text>
           </View>
@@ -243,8 +244,8 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
                     <View style={[styles.typeIconBox, isCustomer ? styles.customerIconBox : styles.systemIconBox]}>
                       <Feather
                         name={isCustomer ? 'message-circle' : 'bell'}
-                        size={15}
-                        color={isCustomer ? Palette.primary : Palette.textSecondary}
+                        size={Typography.iconSize.sm}
+                        color={Palette.primary}
                       />
                     </View>
                     <Text style={styles.noticeTitle}>{item.title}</Text>
@@ -268,7 +269,7 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
                       style={styles.actionChip}
                       onPress={() => Alert.alert('Call', `Dialing ${item.senderName} (${item.phone})`)}
                     >
-                      <Feather name="phone" size={12} color={Palette.primary} style={{ marginRight: 4 }} />
+                      <Feather name="phone" size={Typography.iconSize.sm} color={Palette.accentText} style={{ marginRight: 4 }} />
                       <Text style={styles.actionChipText}>Call</Text>
                     </TouchableOpacity>
 
@@ -276,7 +277,7 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
                       style={styles.actionChip}
                       onPress={() => Alert.alert('WhatsApp', `Opening WhatsApp for ${item.senderName}`)}
                     >
-                      <MaterialCommunityIcons name="whatsapp" size={13} color={Palette.status.active.text} style={{ marginRight: 4 }} />
+                      <Feather name="message-circle" size={Typography.iconSize.sm} color={Palette.status.active.text} style={{ marginRight: 4 }} />
                       <Text style={[styles.actionChipText, { color: Palette.status.active.text }]}>WhatsApp</Text>
                     </TouchableOpacity>
                   </View>
@@ -293,12 +294,13 @@ export default function NotificationsView({ initialNoticeId, onBack }: Notificat
 const styles = StyleSheet.create({
   outerScreen: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: Palette.background,
   },
   container: {
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 110,
+    paddingBottom: 24,
     backgroundColor: Palette.background,
   },
   headerRow: {
@@ -314,8 +316,8 @@ const styles = StyleSheet.create({
   backButtonCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: Palette.surface,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.border,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '700',
     color: Palette.text,
     letterSpacing: 0.3,
@@ -338,9 +340,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   clearButtonText: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     fontWeight: '600',
-    color: Palette.primary,
+    color: Palette.accentText,
   },
   filterRow: {
     flexDirection: 'row',
@@ -350,7 +352,7 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: Radius.pill,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -360,25 +362,25 @@ const styles = StyleSheet.create({
     borderColor: Palette.primary,
   },
   filterChipText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '600',
     color: Palette.text,
   },
   filterChipTextActive: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
   },
   noticeCard: {
     backgroundColor: Palette.surface,
-    borderRadius: 14,
+    borderRadius: 5,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Palette.border,
   },
   noticeCardHighlighted: {
-    borderColor: Palette.primary,
+    borderColor: Palette.accentText,
     borderWidth: 1.5,
-    backgroundColor: '#FFFDF9',
+    backgroundColor: Palette.surface,
   },
   noticeTopRow: {
     flexDirection: 'row',
@@ -395,19 +397,19 @@ const styles = StyleSheet.create({
   typeIconBox: {
     width: 28,
     height: 28,
-    borderRadius: 14,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
   },
   customerIconBox: {
-    backgroundColor: '#F7EFE8',
+    backgroundColor: Palette.iconBg,
   },
   systemIconBox: {
-    backgroundColor: Palette.background,
+    backgroundColor: Palette.iconBg,
   },
   noticeTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
     color: Palette.text,
   },
@@ -417,16 +419,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   singleWordTag: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.caption,
     fontWeight: '700',
-    color: Palette.primary,
+    color: Palette.accentText,
   },
   noticeTime: {
-    fontSize: 11.5,
+    fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
   },
   noticeMessage: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     color: Palette.text,
     lineHeight: 19,
     marginTop: 2,
@@ -437,22 +439,22 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: Palette.background,
+    borderTopColor: Palette.divider,
   },
   actionChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.background,
+    backgroundColor: Palette.iconBg,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: Palette.border,
   },
   actionChipText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.caption,
     fontWeight: '600',
-    color: Palette.primary,
+    color: Palette.accentText,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -461,13 +463,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emptyTitle: {
-    fontSize: 16.5,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
     color: Palette.text,
     marginBottom: 6,
   },
   emptySub: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     textAlign: 'center',
   },

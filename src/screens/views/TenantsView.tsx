@@ -13,7 +13,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Palette } from '../../constants/theme';
+import { Palette, Radius } from '../../constants/theme';
 
 interface TenantsViewProps {
   onBack?: () => void;
@@ -139,14 +139,15 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
   return (
     <View style={styles.outerScreen}>
       <ScrollView
+        style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#000000"
-            colors={['#000000']}
+            tintColor={Palette.accentText}
+            colors={[Palette.accentText]}
           />
         }
       >
@@ -159,7 +160,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="chevron-left" size={22} color={Palette.text} />
+              <Feather name="chevron-left" size={22} color={Palette.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Residents</Text>
           </View>
@@ -175,7 +176,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
-          <Feather name="search" size={17} color={Palette.textMuted} style={styles.searchIcon} />
+          <Feather name="search" size={17} color={Palette.primary} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search by resident name, room, phone..."
@@ -255,7 +256,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
                   onPress={() => Alert.alert('Call Resident', `Calling ${resident.name} at ${resident.phone}`)}
                   activeOpacity={0.7}
                 >
-                  <Feather name="phone" size={14} color={Palette.primary} style={{ marginRight: 6 }} />
+                  <Feather name="phone" size={14} color={Palette.accentText} style={{ marginRight: 6 }} />
                   <Text style={styles.actionBtnSecondaryText}>Call</Text>
                 </TouchableOpacity>
 
@@ -351,12 +352,13 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
 const styles = StyleSheet.create({
   outerScreen: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: Palette.background,
   },
   container: {
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 110,
+    paddingBottom: 24,
     backgroundColor: Palette.background,
   },
   headerRow: {
@@ -372,8 +374,8 @@ const styles = StyleSheet.create({
   backButtonCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: Palette.surface,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -395,10 +397,10 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingHorizontal: 20,
     paddingVertical: 9,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
   },
   addButtonText: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
     fontWeight: '700',
     fontSize: 14,
   },
@@ -406,7 +408,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Palette.surface,
-    borderRadius: 12,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Palette.border,
     paddingHorizontal: 12,
@@ -429,7 +431,7 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: 20,
+    borderRadius: Radius.pill,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -444,11 +446,11 @@ const styles = StyleSheet.create({
     color: Palette.text,
   },
   filterChipTextActive: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
   },
   card: {
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: Radius.md,
     padding: 16,
     marginBottom: 14,
     borderWidth: 1,
@@ -461,8 +463,8 @@ const styles = StyleSheet.create({
   residentAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: Palette.background,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -472,7 +474,7 @@ const styles = StyleSheet.create({
   avatarInitial: {
     fontSize: 18,
     fontWeight: '700',
-    color: Palette.primary,
+    color: Palette.accentText,
   },
   residentMain: {
     flex: 1,
@@ -490,7 +492,7 @@ const styles = StyleSheet.create({
   badge: {
     paddingHorizontal: 9,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: Radius.sm,
   },
   badgeActive: {
     backgroundColor: Palette.status.active.bg,
@@ -510,7 +512,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: Palette.border,
+    backgroundColor: Palette.divider,
     marginVertical: 12,
   },
   cardDetailsRow: {
@@ -541,12 +543,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.border,
     paddingVertical: 9,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
   },
   actionBtnSecondaryText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Palette.primary,
+    color: Palette.accentText,
   },
   actionBtnPrimary: {
     flex: 1.5,
@@ -554,12 +556,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 9,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
   },
   actionBtnPrimaryText: {
     fontSize: 13,
     fontWeight: '700',
-    color: Palette.surface,
+    color: Palette.onPrimary,
   },
   modalOverlay: {
     flex: 1,
@@ -573,13 +575,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(46, 39, 34, 0.5)',
+    backgroundColor: Palette.backdrop,
   },
   modalCard: {
     width: '100%',
     maxWidth: 380,
     backgroundColor: Palette.surface,
-    borderRadius: 18,
+    borderRadius: Radius.md,
     padding: 20,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -606,7 +608,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
@@ -621,7 +623,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Palette.border,
     backgroundColor: Palette.surface,
@@ -635,10 +637,10 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingVertical: 10,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
   },
   saveButtonText: {
-    color: Palette.surface,
+    color: Palette.onPrimary,
     fontWeight: '700',
     fontSize: 13.5,
   },

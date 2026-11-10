@@ -16,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import LuvoraLogo from '../components/LuvoraLogo';
-import { Palette } from '../constants/theme';
+import { Palette, Radius, Typography } from '../constants/theme';
 
 interface LoginScreenProps {
   onLoginSuccess?: (user: { email: string; role: string }) => void;
@@ -144,8 +144,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               >
                 <Feather
                   name="mail"
-                  size={18}
-                  color={isEmailFocused ? Palette.primary : Palette.textSecondary}
+                  size={Typography.iconSize.base}
+                  color={Palette.primary}
                   style={styles.leftIcon}
                 />
                 <TextInput
@@ -155,6 +155,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Email address"
                   value={email}
                   onChangeText={setEmail}
                   onFocus={() => setIsEmailFocused(true)}
@@ -163,8 +164,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               </View>
             </View>
 
-            {/* Password Field */}
-            <View style={styles.inputGroup}>
+            {/* Password Field & Recovery Link */}
+            <View style={styles.passwordGroup}>
               <Text style={styles.inputLabel}>Password</Text>
               <View
                 style={[
@@ -174,8 +175,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               >
                 <Feather
                   name="lock"
-                  size={18}
-                  color={isPasswordFocused ? Palette.primary : Palette.textSecondary}
+                  size={Typography.iconSize.base}
+                  color={Palette.primary}
                   style={styles.leftIcon}
                 />
                 <TextInput
@@ -185,6 +186,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   secureTextEntry={!isPasswordVisible}
                   autoCapitalize="none"
                   autoCorrect={false}
+                  accessibilityLabel="Password"
                   value={password}
                   onChangeText={setPassword}
                   onFocus={() => setIsPasswordFocused(true)}
@@ -194,24 +196,29 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   onPress={() => setIsPasswordVisible(!isPasswordVisible)}
                   hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
                 >
                   <Feather
                     name={isPasswordVisible ? 'eye-off' : 'eye'}
-                    size={18}
-                    color={Palette.textSecondary}
+                    size={Typography.iconSize.base}
+                    color={Palette.primary}
                   />
                 </TouchableOpacity>
               </View>
-            </View>
 
-            {/* Forgot Password Link */}
-            <TouchableOpacity
-              onPress={() => setIsForgotModalVisible(true)}
-              style={styles.forgotPasswordButton}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.forgotPasswordText}>Forgot password?</Text>
-            </TouchableOpacity>
+              {/* Forgot Password Link grouped directly under password input */}
+              <TouchableOpacity
+                onPress={() => setIsForgotModalVisible(true)}
+                style={styles.forgotPasswordButton}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Forgot password"
+              >
+                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* Sign In Button */}
             <TouchableOpacity
@@ -219,6 +226,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               onPress={handleSignIn}
               activeOpacity={0.88}
               disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
             >
               {isLoading ? (
                 <ActivityIndicator color={Palette.surface} size="small" />
@@ -227,7 +236,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   <Text style={styles.signInButtonText}>Sign in</Text>
                   <Feather
                     name="arrow-right"
-                    size={18}
+                    size={Typography.iconSize.base}
                     color={Palette.surface}
                     style={styles.signInButtonArrow}
                   />
@@ -396,8 +405,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   cardContainer: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Palette.border,
     paddingHorizontal: 22,
@@ -409,7 +421,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   welcomeTitle: {
-    fontSize: 26,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '800',
     color: Palette.text,
     textAlign: 'center',
@@ -417,7 +429,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   welcomeSubtitle: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
@@ -425,8 +437,11 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  passwordGroup: {
+    marginBottom: 20,
+  },
   inputLabel: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '600',
     color: Palette.text,
     marginBottom: 6,
@@ -437,7 +452,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     backgroundColor: Palette.surface,
     paddingHorizontal: 14,
   },
@@ -449,24 +464,23 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: Typography.fontSize.base,
     color: Palette.text,
     paddingVertical: 0,
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
-    marginTop: 2,
-    marginBottom: 22,
+    marginTop: 8,
   },
   forgotPasswordText: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '600',
     color: Palette.primary,
   },
   signInButton: {
     height: 50,
     backgroundColor: Palette.primary,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -480,7 +494,7 @@ const styles = StyleSheet.create({
   },
   signInButtonText: {
     color: Palette.surface,
-    fontSize: 15.5,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
     marginRight: 8,
   },
@@ -494,17 +508,17 @@ const styles = StyleSheet.create({
     marginTop: 22,
   },
   noAccountText: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
   },
   createAccountText: {
-    fontSize: 13.5,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '700',
     color: Palette.primary,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(46, 39, 34, 0.4)',
+    backgroundColor: Palette.backdrop,
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
@@ -516,8 +530,11 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   modalCard: {
+    width: '100%',
+    maxWidth: 440,
+    alignSelf: 'center',
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: Radius.md,
     borderWidth: 1,
     borderColor: Palette.border,
     padding: 22,
@@ -529,12 +546,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     color: Palette.text,
   },
   modalSubtitle: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     marginBottom: 16,
     lineHeight: 18,
@@ -543,42 +560,42 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     backgroundColor: Palette.surface,
     paddingHorizontal: 14,
-    fontSize: 14.5,
+    fontSize: Typography.fontSize.base,
     color: Palette.text,
     marginBottom: 14,
   },
   demoCredentialsBox: {
-    backgroundColor: Palette.background,
-    borderRadius: 8,
+    backgroundColor: Palette.iconBg,
+    borderRadius: Radius.sm,
     borderWidth: 1,
     borderColor: Palette.border,
     padding: 12,
     marginBottom: 16,
   },
   demoBoxTitle: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
     color: Palette.primary,
     marginBottom: 4,
   },
   demoBoxText: {
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     color: Palette.text,
     marginTop: 2,
   },
   modalPrimaryBtn: {
     backgroundColor: Palette.primary,
-    borderRadius: 10,
+    borderRadius: Radius.sm,
     paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalPrimaryBtnText: {
     color: Palette.surface,
-    fontSize: 15,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
   },
 });

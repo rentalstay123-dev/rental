@@ -8,20 +8,46 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Palette } from '../../constants/theme';
+import { Palette, Radius, Typography } from '../../constants/theme';
+import type { RentFilter } from './RentView';
 
 interface DashboardViewProps {
   onNavigatePage?: (
     page: 'Rooms' | 'Rent' | 'Money' | 'Accounts' | 'Notifications',
-    noticeId?: string
+    noticeId?: string,
+    rentFilter?: RentFilter
   ) => void;
 }
 
-const PROPERTIES = [
-  'Sunrise Apartments',
-  'Palm Residency',
-  'City Homes',
-  'Green Villa',
+interface PendingRentItem {
+  id: string;
+  roomNumber: string;
+  badgeLabel: string;
+  badgeType: 'overdue' | 'due';
+  subtitle: string;
+  amount: string;
+  statusNote: string;
+}
+
+const PENDING_RENTS: PendingRentItem[] = [
+  {
+    id: 'rent-102',
+    roomNumber: 'Room 102',
+    badgeLabel: 'Overdue',
+    badgeType: 'overdue',
+    subtitle: 'Priya Sharma · Due Oct 15',
+    amount: '₹15,000',
+    statusNote: 'Pending',
+  },
+  {
+    id: 'rent-201',
+    roomNumber: 'Room 201',
+    badgeLabel: 'Due',
+    badgeType: 'due',
+    subtitle: 'Arjun Kumar · Due Nov 1',
+    amount: '₹10,000',
+    statusNote: 'Upcoming',
+  },
 ];
 
 interface CustomerMessage {
@@ -65,9 +91,6 @@ const CUSTOMER_MESSAGES: CustomerMessage[] = [
 ];
 
 export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
-  const [selectedProperty, setSelectedProperty] = useState('Sunrise Apartments');
-  const [showPropertyMenu, setShowPropertyMenu] = useState(false);
-
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -76,275 +99,212 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
     }, 1000);
   }, []);
 
-  const handlePropertySelect = (prop: string) => {
-    setSelectedProperty(prop);
-    setShowPropertyMenu(false);
-  };
-
   return (
     <ScrollView
+      style={styles.scrollView}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.scrollContent}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#000000"
-          colors={['#000000']}
+          tintColor={Palette.primary}
+          colors={[Palette.primary]}
         />
       }
     >
-      {/* Welcome back */}
-      <Text style={styles.welcomeTitle}>Welcome back</Text>
+      <View style={styles.contentWrapper}>
+        {/* Welcome back */}
+        <Text style={styles.welcomeTitle}>Welcome back</Text>
 
-      {/* Property Selector Dropdown Pill */}
-      <View style={styles.dropdownWrapper}>
+        {/* Hero Card: Net profit · October (White summary card with Coffee Brown highlight & Profit Margin bar) */}
         <TouchableOpacity
-          style={styles.propertyPill}
-          activeOpacity={0.8}
-          onPress={() => setShowPropertyMenu(!showPropertyMenu)}
+          style={styles.profitCard}
+          activeOpacity={0.85}
+          onPress={() => onNavigatePage && onNavigatePage('Accounts')}
+          accessibilityRole="button"
+          accessibilityLabel="Net profit October ₹66,000, view accounts"
         >
-          <Text style={styles.propertyPillText}>{selectedProperty}</Text>
-          <Feather
-            name={showPropertyMenu ? 'chevron-up' : 'chevron-down'}
-            size={16}
-            color={Palette.text}
-            style={styles.dropdownIcon}
-          />
+          <View style={styles.profitHeaderRow}>
+            <Text style={styles.profitHeader}>Net profit · October</Text>
+            <View style={styles.profitBadge}>
+              <Text style={styles.profitBadgeText}>+12% mo</Text>
+            </View>
+          </View>
+          <Text style={styles.profitAmount}>₹66,000</Text>
+          <Text style={styles.profitBreakdown}>Income ₹92,000  ·  Expenses ₹26,000</Text>
+          <View
+            style={styles.profitTrack}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel="Net profit margin: 72% of total income"
+            accessibilityValue={{ min: 0, max: 100, now: 72 }}
+          >
+            <View style={styles.profitFill} />
+          </View>
+          <Text style={styles.profitScaleText}>72% net margin of total income</Text>
         </TouchableOpacity>
 
-        {/* Dropdown Options */}
-        {showPropertyMenu && (
-          <View style={styles.dropdownMenu}>
-            {PROPERTIES.map((prop) => (
-              <TouchableOpacity
-                key={prop}
-                style={[
-                  styles.dropdownMenuItem,
-                  prop === selectedProperty && styles.dropdownMenuItemActive,
-                ]}
-                onPress={() => handlePropertySelect(prop)}
-              >
-                <Text
-                  style={[
-                    styles.dropdownMenuText,
-                    prop === selectedProperty && styles.dropdownMenuTextActive,
-                  ]}
-                >
-                  {prop}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
+        {/* 2-Column Metric Cards */}
+        <View style={styles.metricRow}>
+          {/* Rooms occupied */}
+          <TouchableOpacity
+            style={styles.metricCard}
+            activeOpacity={0.85}
+            onPress={() => onNavigatePage && onNavigatePage('Rooms')}
+            accessibilityRole="button"
+            accessibilityLabel="Rooms occupied 9 of 12, 3 vacant, view rooms"
+          >
+            <Text style={styles.metricLabel}>Rooms occupied</Text>
+            <Text style={styles.metricValue}>9 / 12</Text>
+            <Text style={styles.metricSubtext}>3 vacant</Text>
+          </TouchableOpacity>
 
-      {/* Hero Card: Net profit · October (White summary card with Coffee Brown highlight & Caramel accent) */}
-      <TouchableOpacity
-        style={styles.profitCard}
-        activeOpacity={0.85}
-        onPress={() => onNavigatePage && onNavigatePage('Accounts')}
-      >
-        <View style={styles.profitHeaderRow}>
-          <Text style={styles.profitHeader}>Net profit · October</Text>
-          <View style={styles.profitBadge}>
-            <Text style={styles.profitBadgeText}>+12% mo</Text>
-          </View>
+          {/* Rent pending */}
+          <TouchableOpacity
+            style={styles.metricCard}
+            activeOpacity={0.85}
+            onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
+            accessibilityRole="button"
+            accessibilityLabel="Rent pending ₹25,000, 2 rooms due, view rent"
+          >
+            <Text style={styles.metricLabel}>Rent pending</Text>
+            <Text style={[styles.metricValue, { color: Palette.primary }]}>₹25,000</Text>
+            <Text style={styles.metricSubtext}>2 rooms due</Text>
+          </TouchableOpacity>
         </View>
-        <Text style={styles.profitAmount}>₹66,000</Text>
-        <Text style={styles.profitBreakdown}>Income ₹92,000  ·  Expenses ₹26,000</Text>
-        <View style={styles.caramelAccentLine} />
-      </TouchableOpacity>
 
-      {/* 2-Column Metric Cards */}
-      <View style={styles.metricRow}>
-        {/* Rooms occupied */}
-        <TouchableOpacity
-          style={styles.metricCard}
-          activeOpacity={0.85}
-          onPress={() => onNavigatePage && onNavigatePage('Rooms')}
-        >
-          <Text style={styles.metricLabel}>Rooms occupied</Text>
-          <Text style={styles.metricValue}>9 / 12</Text>
-          <Text style={styles.metricSubtext}>3 vacant</Text>
-        </TouchableOpacity>
+        {/* Section: Rent Due*/}
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Rent Due</Text>
+          <TouchableOpacity
+            style={styles.viewAllButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
+            accessibilityRole="button"
+            accessibilityLabel="View all Rent Due"
+          >
+            <Text style={styles.viewAllText}>View All</Text>
+            <Feather
+              name="chevron-right"
+              size={Typography.iconSize.sm}
+              color={Palette.primary}
+            />
+          </TouchableOpacity>
+        </View>
 
-        {/* Rent pending */}
-        <TouchableOpacity
-          style={styles.metricCard}
-          activeOpacity={0.85}
-          onPress={() => onNavigatePage && onNavigatePage('Rent')}
-        >
-          <Text style={styles.metricLabel}>Rent pending</Text>
-          <Text style={[styles.metricValue, { color: Palette.primary }]}>₹25,000</Text>
-          <Text style={styles.metricSubtext}>2 rooms due</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.cardContainer}>
+          {PENDING_RENTS.map((item, index) => {
+            const isLast = index === PENDING_RENTS.length - 1;
+            const isOverdue = item.badgeType === 'overdue';
+            return (
+              <React.Fragment key={item.id}>
+                <TouchableOpacity
+                  style={styles.pendingItemRow}
+                  activeOpacity={0.7}
+                  onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.roomNumber}, ${item.subtitle}, ${item.badgeLabel}, ${item.amount} ${item.statusNote}`}
+                >
+                  <View style={styles.pendingLeftCol}>
+                    <View style={styles.roomBadgeRow}>
+                      <Text style={styles.pendingRoomNumber}>{item.roomNumber}</Text>
+                      <View style={isOverdue ? styles.overdueBadge : styles.dueBadge}>
+                        <Text
+                          style={isOverdue ? styles.overdueBadgeText : styles.dueBadgeText}
+                        >
+                          {item.badgeLabel}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.pendingTenantText}>{item.subtitle}</Text>
+                  </View>
+                  <View style={styles.rowRightAction}>
+                    <View style={styles.pendingRightCol}>
+                      <Text style={styles.pendingAmount}>{item.amount}</Text>
+                      <Text style={styles.pendingSubInfo}>{item.statusNote}</Text>
+                    </View>
+                    <Feather
+                      name="chevron-right"
+                      size={Typography.iconSize.sm}
+                      color={Palette.primary}
+                    />
+                  </View>
+                </TouchableOpacity>
+                {!isLast && <View style={styles.divider} />}
+              </React.Fragment>
+            );
+          })}
+        </View>
 
-      {/* Section: Pending Room Rents */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Pending room rents</Text>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => onNavigatePage && onNavigatePage('Rent')}
-        >
-          <Text style={styles.viewAllText}>View All</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Section: Service Requests */}
+        <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
+          <Text style={styles.sectionTitle}>Service Requests</Text>
+          <Text style={styles.messageCountText}>{CUSTOMER_MESSAGES.length} new</Text>
+        </View>
 
-      <View style={styles.cardContainer}>
-        {/* Pending Room 102 */}
-        <TouchableOpacity
-          style={styles.pendingItemRow}
-          activeOpacity={0.7}
-          onPress={() => onNavigatePage && onNavigatePage('Rent')}
-        >
-          <View style={styles.pendingLeftCol}>
-            <View style={styles.roomBadgeRow}>
-              <Text style={styles.pendingRoomNumber}>Room 102</Text>
-              <View style={styles.overdueBadge}>
-                <Text style={styles.overdueBadgeText}>Overdue</Text>
-              </View>
-            </View>
-            <Text style={styles.pendingTenantText}>Priya Sharma · Due Oct 15</Text>
-          </View>
-          <View style={styles.pendingRightCol}>
-            <Text style={styles.pendingAmount}>₹15,000</Text>
-            <Text style={styles.pendingSubInfo}>Pending</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={styles.cardContainer}>
+          {CUSTOMER_MESSAGES.map((msg, index) => {
+            const isLast = index === CUSTOMER_MESSAGES.length - 1;
+            return (
+              <React.Fragment key={msg.id}>
+                <TouchableOpacity
+                  style={styles.messageItem}
+                  activeOpacity={0.7}
+                  onPress={() => onNavigatePage && onNavigatePage('Notifications', msg.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${msg.senderName}, ${msg.roomNumber}, ${msg.tag}, open message`}
+                >
+                  <Text style={styles.messageSenderTitle}>
+                    {msg.senderName} · {msg.roomNumber}
+                  </Text>
 
-        <View style={styles.divider} />
-
-        {/* Pending Room 201 */}
-        <TouchableOpacity
-          style={styles.pendingItemRow}
-          activeOpacity={0.7}
-          onPress={() => onNavigatePage && onNavigatePage('Rent')}
-        >
-          <View style={styles.pendingLeftCol}>
-            <View style={styles.roomBadgeRow}>
-              <Text style={styles.pendingRoomNumber}>Room 201</Text>
-              <View style={styles.dueBadge}>
-                <Text style={styles.dueBadgeText}>Due</Text>
-              </View>
-            </View>
-            <Text style={styles.pendingTenantText}>Arjun Kumar · Due Nov 1</Text>
-          </View>
-          <View style={styles.pendingRightCol}>
-            <Text style={styles.pendingAmount}>₹10,000</Text>
-            <Text style={styles.pendingSubInfo}>Upcoming</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Section: Customer messages */}
-      <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Customer messages</Text>
-        <Text style={styles.messageCountText}>{CUSTOMER_MESSAGES.length} new</Text>
-      </View>
-
-      <View style={styles.cardContainer}>
-        {CUSTOMER_MESSAGES.map((msg, index) => {
-          const isLast = index === CUSTOMER_MESSAGES.length - 1;
-          return (
-            <React.Fragment key={msg.id}>
-              <TouchableOpacity
-                style={styles.messageItem}
-                activeOpacity={0.7}
-                onPress={() => onNavigatePage && onNavigatePage('Notifications', msg.id)}
-              >
-                <Text style={styles.messageSenderTitle}>
-                  {msg.senderName} · {msg.roomNumber}
-                </Text>
-
-                <Text style={styles.singleWordTag}>{msg.tag}</Text>
-              </TouchableOpacity>
-              {!isLast && <View style={styles.divider} />}
-            </React.Fragment>
-          );
-        })}
+                  <View style={styles.messageRightRow}>
+                    <Text style={styles.singleWordTag}>{msg.tag}</Text>
+                    <Feather
+                      name="chevron-right"
+                      size={Typography.iconSize.sm}
+                      color={Palette.primary}
+                    />
+                  </View>
+                </TouchableOpacity>
+                {!isLast && <View style={styles.divider} />}
+              </React.Fragment>
+            );
+          })}
+        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+  },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 18,
     paddingTop: 12,
-    paddingBottom: 110,
+    paddingBottom: 24,
     backgroundColor: Palette.background,
+  },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
   },
   welcomeTitle: {
-    fontSize: 26,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '800',
     color: Palette.text,
-    marginBottom: 12,
-    letterSpacing: -0.3,
-  },
-  dropdownWrapper: {
-    position: 'relative',
-    zIndex: 10,
     marginBottom: 16,
-  },
-  propertyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: Palette.surface,
-    borderRadius: 5,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: Palette.border,
-  },
-  propertyPillText: {
-    fontSize: 14.5,
-    fontWeight: '600',
-    color: Palette.text,
-    marginRight: 6,
-  },
-  dropdownIcon: {
-    marginTop: 1,
-  },
-  dropdownMenu: {
-    position: 'absolute',
-    top: 48,
-    left: 0,
-    backgroundColor: Palette.surface,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    width: 220,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
-  },
-  dropdownMenuItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Palette.background,
-  },
-  dropdownMenuItemActive: {
-    backgroundColor: Palette.background,
-  },
-  dropdownMenuText: {
-    fontSize: 14,
-    color: Palette.text,
-    fontWeight: '500',
-  },
-  dropdownMenuTextActive: {
-    color: Palette.primary,
-    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   profitCard: {
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: Palette.border,
     paddingVertical: 20,
@@ -357,7 +317,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profitHeader: {
-    fontSize: 14,
+    fontSize: Typography.fontSize.base,
     color: Palette.textSecondary,
     fontWeight: '600',
   },
@@ -366,27 +326,40 @@ const styles = StyleSheet.create({
   },
   profitBadgeText: {
     color: Palette.status.active.text,
-    fontSize: 12.5,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   profitAmount: {
-    fontSize: 38,
+    fontSize: Typography.fontSize.hero,
     fontWeight: '800',
     color: Palette.primary,
     marginVertical: 6,
     letterSpacing: -0.5,
   },
   profitBreakdown: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '500',
   },
-  caramelAccentLine: {
-    height: 3,
-    backgroundColor: Palette.secondary,
-    borderRadius: 1.5,
+  profitTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: Palette.border,
+    borderRadius: Radius.xs,
+    overflow: 'hidden',
     marginTop: 14,
-    width: '35%',
+  },
+  profitFill: {
+    width: '72%',
+    height: '100%',
+    backgroundColor: Palette.primary,
+    borderRadius: Radius.xs,
+  },
+  profitScaleText: {
+    fontSize: Typography.fontSize.xs,
+    color: Palette.textSecondary,
+    fontWeight: '500',
+    marginTop: 6,
   },
   metricRow: {
     flexDirection: 'row',
@@ -396,25 +369,25 @@ const styles = StyleSheet.create({
   metricCard: {
     width: '48.5%',
     backgroundColor: Palette.surface,
-    borderRadius: 14,
+    borderRadius: 5,
     padding: 16,
     borderWidth: 1,
     borderColor: Palette.border,
   },
   metricLabel: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '500',
     marginBottom: 6,
   },
   metricValue: {
-    fontSize: 24,
+    fontSize: Typography.fontSize.xl,
     fontWeight: '800',
     color: Palette.text,
     marginBottom: 4,
   },
   metricSubtext: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '400',
   },
@@ -425,19 +398,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 19,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.2,
   },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 2,
+  },
   viewAllText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
     color: Palette.primary,
   },
   cardContainer: {
     backgroundColor: Palette.surface,
-    borderRadius: 16,
+    borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderWidth: 1,
@@ -451,6 +430,12 @@ const styles = StyleSheet.create({
   },
   pendingLeftCol: {
     flex: 1,
+    marginRight: 12,
+  },
+  rowRightAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   roomBadgeRow: {
     flexDirection: 'row',
@@ -458,31 +443,31 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   pendingRoomNumber: {
-    fontSize: 15.5,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
     color: Palette.text,
     marginRight: 8,
   },
   pendingTenantText: {
-    fontSize: 13,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
   },
   pendingRightCol: {
     alignItems: 'flex-end',
   },
   pendingAmount: {
-    fontSize: 16,
+    fontSize: Typography.fontSize.md,
     fontWeight: '800',
     color: Palette.primary,
     marginBottom: 2,
   },
   pendingSubInfo: {
-    fontSize: 11,
+    fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
     fontWeight: '500',
   },
   messageCountText: {
-    fontSize: 12.5,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
     color: Palette.primary,
   },
@@ -493,9 +478,11 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   messageSenderTitle: {
-    fontSize: 15,
+    fontSize: Typography.fontSize.md,
     fontWeight: '700',
     color: Palette.text,
+    flexShrink: 1,
+    marginRight: 12,
   },
   messageRightRow: {
     flexDirection: 'row',
@@ -503,7 +490,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   singleWordTag: {
-    fontSize: 12.5,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
     color: Palette.primary,
   },
@@ -512,7 +499,7 @@ const styles = StyleSheet.create({
   },
   overdueBadgeText: {
     color: Palette.status.overdue.text,
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   dueBadge: {
@@ -520,7 +507,7 @@ const styles = StyleSheet.create({
   },
   dueBadgeText: {
     color: Palette.status.due.text,
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   openBadge: {
@@ -528,7 +515,7 @@ const styles = StyleSheet.create({
   },
   openBadgeText: {
     color: Palette.status.pending.text,
-    fontSize: 12,
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   divider: {
