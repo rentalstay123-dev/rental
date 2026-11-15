@@ -12,14 +12,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+  updateProfile,
+} from 'firebase/auth';
+import { auth, getFirebaseAuthErrorMessage } from '../../config/firebase';
 import { Palette, Radius, Typography } from '../../constants/theme';
+import { useAppData } from '../../context/AppDataContext';
 
 interface ProfileViewProps {
   onBack?: () => void;
   onLogout?: () => void;
   userEmail?: string;
+  userName?: string;
 }
 
 interface ProfileModalSheetProps {
@@ -90,27 +100,29 @@ function ProfileModalSheet({
   );
 }
 
-export default function ProfileView({ onBack, onLogout, userEmail }: ProfileViewProps) {
-  const [fullName, setFullName] = useState('Rajesh Sharma');
-  const [email, setEmail] = useState(userEmail || 'rajesh.owner@luvora.in');
-  const [phone, setPhone] = useState('+91 98450 12345');
-  const [propertyName, setPropertyName] = useState('Sunrise Apartments, Mangalore');
+export default function ProfileView({ onBack, onLogout, userEmail, userName }: ProfileViewProps) {
+  const { profile, updateProfile: saveProfileToDb, refreshWorkspace } = useAppData();
 
-  const [bankName, setBankName] = useState('HDFC Bank');
-  const [accountHolder, setAccountHolder] = useState('Rajesh Sharma');
-  const [accountNumber, setAccountNumber] = useState('50100234894590');
-  const [ifscCode, setIfscCode] = useState('HDFC0001234');
-
-  const [biometricEnabled, setBiometricEnabled] = useState(true);
-  const [alertsEnabled, setAlertsEnabled] = useState(true);
+  const fullName = profile.fullName || userName || 'Rajesh Sharma';
+  const email = profile.email || userEmail || 'owner@luvora.com';
+  const phone = profile.phone;
+  const propertyName = profile.propertyName;
+  const bankName = profile.bankName;
+  const accountHolder = profile.accountHolder;
+  const accountNumber = profile.accountNumber;
+  const ifscCode = profile.ifscCode;
+  const biometricEnabled = profile.biometricEnabled;
+  const alertsEnabled = profile.alertsEnabled;
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
 
   const [modalError, setModalError] = useState<string | null>(null);
 
@@ -133,6 +145,7 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // Logout confirm modal
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -146,17 +159,29 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
     setShowEditProfile(true);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!draftName.trim() || !draftEmail.trim() || !draftPhone.trim()) {
       setModalError('Name, email, and phone number are required.');
       return;
     }
-    setFullName(draftName.trim());
-    setEmail(draftEmail.trim());
-    setPhone(draftPhone.trim());
-    setPropertyName(draftProperty.trim() || 'Sunrise Apartments, Mangalore');
+    const nextName = draftName.trim();
+    if (auth.currentUser && nextName !== auth.currentUser.displayName) {
+      try {
+        await updateProfile(auth.currentUser, { displayName: nextName });
+      } catch (error) {
+        setModalError(getFirebaseAuthErrorMessage(error, 'Could not update profile name.'));
+        return;
+      }
+    }
     setModalError(null);
     setShowEditProfile(false);
+    void saveProfileToDb({
+      ...profile,
+      fullName: nextName,
+      email: draftEmail.trim(),
+      phone: draftPhone.trim(),
+      propertyName: draftProperty.trim() || 'Sunrise Apartments, Mangalore',
+    });
   };
 
   const openEditBankModal = () => {
@@ -174,12 +199,15 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
       setModalError('Please enter valid bank name, holder name, account number, and IFSC code.');
       return;
     }
-    setBankName(draftBankName.trim());
-    setAccountHolder(draftAccountHolder.trim());
-    setAccountNumber(cleanAcct);
-    setIfscCode(draftIfsc.trim().toUpperCase());
     setModalError(null);
     setShowEditBank(false);
+    void saveProfileToDb({
+      ...profile,
+      bankName: draftBankName.trim(),
+      accountHolder: draftAccountHolder.trim(),
+      accountNumber: cleanAcct,
+      ifscCode: draftIfsc.trim().toUpperCase(),
+    });
   };
 
   const openPasswordModal = () => {
@@ -190,7 +218,7 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
     setShowChangePassword(true);
   };
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
     if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
       setModalError('Please fill in all password fields.');
       return;
@@ -203,8 +231,25 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
       setModalError('New password and confirmation do not match.');
       return;
     }
+
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      setModalError('No signed-in email account found.');
+      return;
+    }
+
     setModalError(null);
-    setShowChangePassword(false);
+    setIsUpdatingPassword(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+      setShowChangePassword(false);
+    } catch (error) {
+      setModalError(getFirebaseAuthErrorMessage(error, 'Could not update password.'));
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const personalRows: {
@@ -224,6 +269,8 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -361,7 +408,9 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
               </View>
               <Switch
                 value={biometricEnabled}
-                onValueChange={setBiometricEnabled}
+                onValueChange={(val) =>
+                  void saveProfileToDb({ ...profile, biometricEnabled: val })
+                }
                 trackColor={{ false: Palette.border, true: Palette.primary }}
                 thumbColor={Palette.surface}
               />
@@ -379,7 +428,9 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
               </View>
               <Switch
                 value={alertsEnabled}
-                onValueChange={setAlertsEnabled}
+                onValueChange={(val) =>
+                  void saveProfileToDb({ ...profile, alertsEnabled: val })
+                }
                 trackColor={{ false: Palette.border, true: Palette.primary }}
                 thumbColor={Palette.surface}
               />
@@ -532,7 +583,7 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
       <ProfileModalSheet
         visible={showChangePassword}
         title="Change Password"
-        onClose={() => setShowChangePassword(false)}
+        onClose={() => !isUpdatingPassword && setShowChangePassword(false)}
         errorText={modalError}
       >
         <Text style={styles.inputLabel}>Current Password</Text>
@@ -566,11 +617,16 @@ export default function ProfileView({ onBack, onLogout, userEmail }: ProfileView
         />
 
         <TouchableOpacity
-          style={styles.modalPrimaryBtn}
+          style={[styles.modalPrimaryBtn, isUpdatingPassword && styles.modalPrimaryBtnDisabled]}
           activeOpacity={0.85}
           onPress={handleSavePassword}
+          disabled={isUpdatingPassword}
         >
-          <Text style={styles.modalPrimaryBtnText}>Update Password</Text>
+          {isUpdatingPassword ? (
+            <ActivityIndicator color={Palette.onPrimary} size="small" />
+          ) : (
+            <Text style={styles.modalPrimaryBtnText}>Update Password</Text>
+          )}
         </TouchableOpacity>
       </ProfileModalSheet>
 
@@ -633,15 +689,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
@@ -937,6 +988,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 4,
+  },
+  modalPrimaryBtnDisabled: {
+    opacity: 0.75,
   },
   modalPrimaryBtnText: {
     color: Palette.onPrimary,

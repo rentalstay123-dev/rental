@@ -10,9 +10,11 @@ import {
   TextInput,
   Image,
   RefreshControl,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
+import { useAppData } from '../../context/AppDataContext';
 
 export interface RoomsViewProps {
   rooms?: RoomItem[];
@@ -735,6 +737,8 @@ export default function RoomsView({
   floors: propFloors,
   onBack,
 }: RoomsViewProps) {
+  const { refreshWorkspace } = useAppData();
+
   const [localRooms, setLocalRooms] = useState<RoomItem[]>(INITIAL_ROOMS);
   const rooms = propRooms || localRooms;
   const setRooms = propSetRooms || setLocalRooms;
@@ -754,12 +758,14 @@ export default function RoomsView({
   const [bookReturnScreen, setBookReturnScreen] = useState<'main' | 'details'>('main');
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
 
   // Financial inline editing state
   const [isEditingFinancials, setIsEditingFinancials] = useState(false);
@@ -1158,11 +1164,15 @@ export default function RoomsView({
   };
 
   return (
-    <View style={styles.outerScreen}>
+    <KeyboardAvoidingView
+      style={styles.outerScreen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -1674,10 +1684,10 @@ export default function RoomsView({
                     </Text>
                     <Text style={styles.headerSubtitle}>
                       {selectedRoomType && selectedFloor
-                        ? `${selectedFloor} · ${currentTypeRooms.length} ${currentTypeRooms.length === 1 ? 'Room' : 'Rooms'}`
+                        ? `${selectedFloor} · ${currentTypeRooms.length} ${currentTypeRooms.length === 1 ? 'Unit' : 'Units'}`
                         : selectedFloor
-                          ? `${currentFloorRooms.length} ${currentFloorRooms.length === 1 ? 'Room' : 'Rooms'}`
-                          : `${rooms.length} Rooms · ${displayFloors.length} ${displayFloors.length === 1 ? 'Floor' : 'Floors'}`}
+                          ? `${currentFloorRooms.length} ${currentFloorRooms.length === 1 ? 'Unit' : 'Units'}`
+                          : `${rooms.length} ${rooms.length === 1 ? 'Unit' : 'Units'} · ${displayFloors.length} ${displayFloors.length === 1 ? 'Floor' : 'Floors'}`}
                     </Text>
                   </View>
                 </View>
@@ -1738,7 +1748,7 @@ export default function RoomsView({
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.roomTypeTitle}>{floorName}</Text>
                                   <Text style={styles.roomTypeSubtitle}>
-                                    {matching.length} {matching.length === 1 ? 'Room' : 'Rooms'} · {occupied} Occupied · {vacant} Vacant
+                                    {matching.length} {matching.length === 1 ? 'Unit' : 'Units'} · {occupied} Occupied · {vacant} Vacant
                                   </Text>
                                 </View>
                               </View>
@@ -1798,7 +1808,7 @@ export default function RoomsView({
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.roomTypeTitle}>{type}</Text>
                                   <Text style={styles.roomTypeSubtitle}>
-                                    {matching.length} {matching.length === 1 ? 'Room' : 'Rooms'} · {occupied} Occupied · {vacant} Vacant
+                                    {matching.length} {matching.length === 1 ? 'Unit' : 'Units'} · {occupied} Occupied · {vacant} Vacant
                                   </Text>
                                 </View>
                               </View>
@@ -2126,7 +2136,7 @@ export default function RoomsView({
           ) : null}
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -2158,15 +2168,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,

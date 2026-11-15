@@ -15,6 +15,7 @@ import { Palette, Radius, Typography } from '../constants/theme';
 
 export type DrawerMenuKey =
   | 'Deposits'
+  | 'Staff'
   | 'Reports'
   | 'Settings'
   | 'Profile';
@@ -40,6 +41,12 @@ const PRIMARY_MENU_ITEMS: MenuItemConfig[] = [
     label: 'Deposits',
     subtitle: 'Held and refunds',
     icon: 'lock',
+  },
+  {
+    key: 'Staff',
+    label: 'Staff',
+    subtitle: 'Team, shifts & salaries',
+    icon: 'users',
   },
   {
     key: 'Reports',
@@ -110,6 +117,7 @@ export default function HamburgerDrawer({
           <ScrollView
             style={styles.menuScroll}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             contentContainerStyle={[
               styles.menuScrollContent,
               { paddingBottom: Math.max(insets.bottom, 16) + 20 },

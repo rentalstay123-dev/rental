@@ -16,6 +16,14 @@ import {
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import {
+  DEFAULT_ROOM_TYPE_FINANCIALS,
+  INITIAL_MAINTENANCE_REASONS,
+  INITIAL_ROOM_TYPES,
+} from '../../constants/initialData';
+import { useAppData } from '../../context/AppDataContext';
+import type { RoomTypeDefaultFinancials } from '../../types/appData';
+import { formatRupeeAmount, formatShortDate, parseRupeeAmount } from '../../utils/finance';
+import {
   INITIAL_FLOORS,
   INITIAL_ROOMS,
   RoomItem,
@@ -28,24 +36,7 @@ import {
   sortRoomNumbers,
 } from './RoomsView';
 
-export const INITIAL_MAINTENANCE_REASONS: string[] = [
-  'Plumbing',
-  'Electrical',
-  'Fan repair',
-  'Paint',
-  'Lift service',
-  'Appliance / AC',
-  'Carpentry',
-  'Cleaning',
-  'Water leakage',
-];
-
-export const INITIAL_ROOM_TYPES: string[] = [
-  '1 BHK',
-  '2 BHK',
-  '3 BHK',
-  'Studio / 1 RK',
-];
+export { INITIAL_MAINTENANCE_REASONS, INITIAL_ROOM_TYPES };
 
 export interface SettingsViewProps {
   rooms?: RoomItem[];
@@ -67,19 +58,17 @@ interface ConfirmDialogState {
   onConfirm: () => void;
 }
 
-const DEFAULT_RENT_BY_TYPE: Record<string, { rent: string; deposit: string }> = {
-  '1bhk': { rent: '₹9,500', deposit: '₹19,000' },
-  '2bhk': { rent: '₹12,500', deposit: '₹25,000' },
-  '3bhk': { rent: '₹18,500', deposit: '₹37,000' },
-  studio1rk: { rent: '₹7,500', deposit: '₹15,000' },
-};
+const RENT_CYCLE_PRESETS = ['1st of month', '5th of month', '10th of month', '15th of month'];
+const GRACE_PERIOD_PRESETS = ['3 days', '5 days', '7 days', '10 days'];
 
-const getDefaultFinancialsForType = (type: string): { rent: string; deposit: string } => {
+const getFallbackFinancialsForType = (type: string): RoomTypeDefaultFinancials => {
+  const exact = DEFAULT_ROOM_TYPE_FINANCIALS[type];
+  if (exact) return exact;
   const key = type.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (DEFAULT_RENT_BY_TYPE[key]) return DEFAULT_RENT_BY_TYPE[key];
-  if (key.includes('3bhk')) return DEFAULT_RENT_BY_TYPE['3bhk'];
-  if (key.includes('2bhk')) return DEFAULT_RENT_BY_TYPE['2bhk'];
-  if (key.includes('studio') || key.includes('1rk')) return DEFAULT_RENT_BY_TYPE.studio1rk;
+  if (key.includes('3bhk')) return DEFAULT_ROOM_TYPE_FINANCIALS['3 BHK'];
+  if (key.includes('2bhk')) return DEFAULT_ROOM_TYPE_FINANCIALS['2 BHK'];
+  if (key.includes('studio') || key.includes('1rk')) return DEFAULT_ROOM_TYPE_FINANCIALS['Studio / 1 RK'];
+  if (key.includes('1bhk')) return DEFAULT_ROOM_TYPE_FINANCIALS['1 BHK'];
   return { rent: '₹9,000', deposit: '₹18,000' };
 };
 
@@ -93,6 +82,14 @@ const sortFloorsList = (list: string[]): string[] =>
     return a.localeCompare(b);
   });
 
+const normalizeRoomNumberInput = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  return /^room\s+/i.test(trimmed)
+    ? `Room ${trimmed.replace(/^room\s+/i, '').trim()}`
+    : `Room ${trimmed}`;
+};
+
 export default function SettingsView({
   rooms: propRooms,
   onAddRoom,
@@ -101,50 +98,77 @@ export default function SettingsView({
   maintenanceReasons: propMaintenanceReasons,
   setMaintenanceReasons: propSetMaintenanceReasons,
   roomTypes: propRoomTypes,
-  setRoomTypes: propSetRoomTypes,
   floors: propFloors,
   setFloors: propSetFloors,
 }: SettingsViewProps) {
-  const [localRooms, setLocalRooms] = useState<RoomItem[]>(INITIAL_ROOMS);
-  const rooms = propRooms || localRooms;
-  const [localMaintenanceReasons, setLocalMaintenanceReasons] = useState<string[]>(INITIAL_MAINTENANCE_REASONS);
-  const maintenanceReasons = propMaintenanceReasons || localMaintenanceReasons;
-  const setMaintenanceReasons = propSetMaintenanceReasons || setLocalMaintenanceReasons;
-  const [localRoomTypes, setLocalRoomTypes] = useState<string[]>(INITIAL_ROOM_TYPES);
-  const roomTypes = propRoomTypes || localRoomTypes;
-  const setRoomTypes = propSetRoomTypes || setLocalRoomTypes;
-  const [localFloors, setLocalFloors] = useState<string[]>(INITIAL_FLOORS);
-  const floors = propFloors || localFloors;
-  const setFloors = propSetFloors || setLocalFloors;
+  const {
+    rooms: ctxRooms,
+    setRoomsList,
+    upsertSingleRoom,
+    removeRoom,
+    settings: ctxSettings,
+    updateSettings,
+    clearAllWorkspaceData,
+    restoreSampleWorkspaceData,
+    refreshWorkspace,
+  } = useAppData();
+
+  const rooms = propRooms ?? ctxRooms ?? INITIAL_ROOMS;
+  const maintenanceReasons = propMaintenanceReasons ?? ctxSettings.maintenanceReasons ?? INITIAL_MAINTENANCE_REASONS;
+  const setMaintenanceReasons = propSetMaintenanceReasons ?? ((updater: React.SetStateAction<string[]>) => {
+    const next = typeof updater === 'function' ? updater(maintenanceReasons) : updater;
+    void updateSettings({ maintenanceReasons: next });
+  });
+  const roomTypes = propRoomTypes ?? ctxSettings.roomTypes ?? INITIAL_ROOM_TYPES;
+  const floors = propFloors ?? ctxSettings.floors ?? INITIAL_FLOORS;
+  const setFloors = propSetFloors ?? ((updater: React.SetStateAction<string[]>) => {
+    const next = typeof updater === 'function' ? updater(floors) : updater;
+    void updateSettings({ floors: next });
+  });
+
+  const roomTypeDefaults = ctxSettings.roomTypeDefaults ?? DEFAULT_ROOM_TYPE_FINANCIALS;
+
+  const getDefaultsForType = (type: string): RoomTypeDefaultFinancials =>
+    roomTypeDefaults[type] ?? getFallbackFinancialsForType(type);
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
 
-  const [rentCycleDay, setRentCycleDay] = useState('1st of month');
-  const [gracePeriod, setGracePeriod] = useState('5 days');
-  const [lateFee, setLateFee] = useState('₹500');
-  const [autoReminder, setAutoReminder] = useState(true);
-  const [maintenanceNotify, setMaintenanceNotify] = useState(true);
+  const [draftRentCycleDay, setDraftRentCycleDay] = useState<string | null>(null);
+  const [draftGracePeriod, setDraftGracePeriod] = useState<string | null>(null);
+  const [draftLateFee, setDraftLateFee] = useState<string | null>(null);
+
+  const rentCycleDay = draftRentCycleDay ?? ctxSettings.rentCycleDay;
+  const gracePeriod = draftGracePeriod ?? ctxSettings.gracePeriod;
+  const lateFee = draftLateFee ?? ctxSettings.lateFee;
+  const autoReminder = ctxSettings.autoReminder;
+  const maintenanceNotify = ctxSettings.maintenanceNotify;
+  const hasUnsavedRuleEdits =
+    draftRentCycleDay !== null || draftGracePeriod !== null || draftLateFee !== null;
 
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
-  // Add Floor Modal State
-  const [isAddFloorModalVisible, setIsAddFloorModalVisible] = useState(false);
-  const [newFloorName, setNewFloorName] = useState('');
+  // Add / Rename Floor Modal State
+  const [isFloorModalVisible, setIsFloorModalVisible] = useState(false);
+  const [editingFloorOriginal, setEditingFloorOriginal] = useState<string | null>(null);
+  const [floorNameInput, setFloorNameInput] = useState('');
   const [newFloorRoomsCount, setNewFloorRoomsCount] = useState('');
   const [newFloorDefaultType, setNewFloorDefaultType] = useState(roomTypes[0] || '1 BHK');
   const [newFloorRent, setNewFloorRent] = useState('');
   const [newFloorDeposit, setNewFloorDeposit] = useState('');
 
-  // Add Room Modal State
-  const [isAddRoomModalVisible, setIsAddRoomModalVisible] = useState(false);
+  // Add / Edit Unit Modal State
+  const [isRoomModalVisible, setIsRoomModalVisible] = useState(false);
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [newRoomFloor, setNewRoomFloor] = useState(floors[0] || 'Floor 1');
   const [isRoomFloorDropdownOpen, setIsRoomFloorDropdownOpen] = useState(false);
   const [newRoomNumber, setNewRoomNumber] = useState('');
@@ -155,15 +179,19 @@ export default function SettingsView({
   const [newTenantPhone, setNewTenantPhone] = useState('');
   const [newRent, setNewRent] = useState('');
   const [newDeposit, setNewDeposit] = useState('');
-  const [newStatus, setNewStatus] = useState<'Occupied' | 'Vacant'>('Vacant');
+  const [newStatus, setNewStatus] = useState<'Occupied' | 'Rent due' | 'Vacant'>('Vacant');
 
-  // Add Room Type Modal State
-  const [isAddRoomTypeModalVisible, setIsAddRoomTypeModalVisible] = useState(false);
-  const [newRoomTypeText, setNewRoomTypeText] = useState('');
+  // Add / Edit Room Type Modal State
+  const [isRoomTypeModalVisible, setIsRoomTypeModalVisible] = useState(false);
+  const [editingRoomTypeOriginal, setEditingRoomTypeOriginal] = useState<string | null>(null);
+  const [roomTypeNameInput, setRoomTypeNameInput] = useState('');
+  const [roomTypeDefaultRentInput, setRoomTypeDefaultRentInput] = useState('');
+  const [roomTypeDefaultDepositInput, setRoomTypeDefaultDepositInput] = useState('');
 
-  // Add Maintenance Reason Modal State
-  const [isAddReasonModalVisible, setIsAddReasonModalVisible] = useState(false);
-  const [newReasonText, setNewReasonText] = useState('');
+  // Add / Edit Maintenance Reason Modal State
+  const [isReasonModalVisible, setIsReasonModalVisible] = useState(false);
+  const [editingReasonOriginal, setEditingReasonOriginal] = useState<string | null>(null);
+  const [reasonNameInput, setReasonNameInput] = useState('');
 
   const appendRooms = (created: RoomItem[]) => {
     if (created.length === 0) return;
@@ -176,30 +204,74 @@ export default function SettingsView({
     } else if (onAddRoom) {
       created.forEach((rm) => onAddRoom(rm));
     } else {
-      setLocalRooms((prev) => [...prev, ...created]);
+      setRoomsList((prev) => [...prev, ...created]);
     }
   };
 
+  // --- FLOOR HANDLERS ---
   const handleOpenAddFloorModal = () => {
     const numericFloors = floors
       .map((fl) => extractFloorNumber(fl))
       .filter((n): n is number => n !== null);
     const nextFloorNum = numericFloors.length > 0 ? Math.max(...numericFloors) + 1 : floors.length + 1;
-    setNewFloorName(`Floor ${nextFloorNum}`);
+    const defaultType = roomTypes[0] || '1 BHK';
+    const typeDefaults = getDefaultsForType(defaultType);
+
+    setEditingFloorOriginal(null);
+    setFloorNameInput(`Floor ${nextFloorNum}`);
     setNewFloorRoomsCount('');
-    setNewFloorDefaultType(roomTypes[0] || '1 BHK');
-    setNewFloorRent('');
-    setNewFloorDeposit('');
+    setNewFloorDefaultType(defaultType);
+    setNewFloorRent(String(parseRupeeAmount(typeDefaults.rent)));
+    setNewFloorDeposit(String(parseRupeeAmount(typeDefaults.deposit)));
     setModalError(null);
-    setIsAddFloorModalVisible(true);
+    setIsFloorModalVisible(true);
   };
 
-  const handleAddFloor = () => {
-    const formatted = formatFloorLabel(newFloorName);
+  const handleOpenEditFloorModal = (floorName: string) => {
+    setEditingFloorOriginal(floorName);
+    setFloorNameInput(floorName);
+    setNewFloorRoomsCount('');
+    setModalError(null);
+    setIsFloorModalVisible(true);
+  };
+
+  const handleSaveFloor = () => {
+    const formatted = formatFloorLabel(floorNameInput);
     if (!formatted) {
       setModalError('Please enter a floor name or number (e.g. Floor 4).');
       return;
     }
+
+    if (editingFloorOriginal) {
+      if (
+        !matchesFloorName(editingFloorOriginal, formatted) &&
+        floors.some((fl) => matchesFloorName(fl, formatted))
+      ) {
+        setModalError(`${formatted} is already in your floors list.`);
+        return;
+      }
+
+      const updatedFloors = sortFloorsList(
+        floors.map((fl) => (matchesFloorName(fl, editingFloorOriginal) ? formatted : fl))
+      );
+      setFloors(updatedFloors);
+
+      // Update floor & wing prefix on any matching rooms
+      setRoomsList((prev) =>
+        prev.map((rm) => {
+          if (!matchesFloorName(getRoomFloor(rm), editingFloorOriginal)) return rm;
+          const wingParts = rm.wing.split('·').map((s) => s.trim());
+          const updatedWing =
+            wingParts.length > 1 ? `${formatted} · ${wingParts.slice(1).join(' · ')}` : formatted;
+          return { ...rm, floor: formatted, wing: updatedWing };
+        })
+      );
+
+      setIsFloorModalVisible(false);
+      setStatusNotice(`Updated "${editingFloorOriginal}" to "${formatted}".`);
+      return;
+    }
+
     if (floors.some((fl) => matchesFloorName(fl, formatted))) {
       setModalError(`${formatted} is already in your floors list.`);
       return;
@@ -207,11 +279,11 @@ export default function SettingsView({
 
     const parsedCount = newFloorRoomsCount.trim() ? parseInt(newFloorRoomsCount.trim(), 10) : 0;
     if (newFloorRoomsCount.trim() && (Number.isNaN(parsedCount) || parsedCount < 0)) {
-      setModalError('Please enter a valid number of rooms.');
+      setModalError('Please enter a valid number of units.');
       return;
     }
     if (parsedCount > 50) {
-      setModalError('You can auto-create up to 50 rooms per floor at once.');
+      setModalError('You can auto-create up to 50 units per floor at once.');
       return;
     }
 
@@ -224,17 +296,13 @@ export default function SettingsView({
 
     const createdRooms: RoomItem[] = [];
     if (parsedCount > 0) {
-      const defaults = getDefaultFinancialsForType(newFloorDefaultType || roomTypes[0] || '1 BHK');
-      const rentFormatted = newFloorRent.trim()
-        ? newFloorRent.trim().startsWith('₹')
-          ? newFloorRent.trim()
-          : `₹${Number(newFloorRent.replace(/[^0-9]/g, '') || 9000).toLocaleString('en-IN')}`
-        : defaults.rent;
-      const depositFormatted = newFloorDeposit.trim()
-        ? newFloorDeposit.trim().startsWith('₹')
-          ? newFloorDeposit.trim()
-          : `₹${Number(newFloorDeposit.replace(/[^0-9]/g, '') || 18000).toLocaleString('en-IN')}`
-        : defaults.deposit;
+      const typeChosen = newFloorDefaultType || roomTypes[0] || '1 BHK';
+      const defaults = getDefaultsForType(typeChosen);
+      const parsedRent = parseRupeeAmount(newFloorRent);
+      const parsedDeposit = parseRupeeAmount(newFloorDeposit);
+      const rentFormatted = parsedRent > 0 ? formatRupeeAmount(parsedRent) : defaults.rent;
+      const depositFormatted =
+        parsedDeposit > 0 ? formatRupeeAmount(parsedDeposit) : defaults.deposit;
 
       const baseTimestamp = Date.now();
       for (let i = 0; i < parsedCount; i++) {
@@ -248,7 +316,7 @@ export default function SettingsView({
           roomNumber,
           floor: formatted,
           wing: formatted,
-          type: newFloorDefaultType || roomTypes[0] || '1 BHK',
+          type: typeChosen,
           monthlyRent: rentFormatted,
           depositAmount: depositFormatted,
           status: 'Vacant',
@@ -258,18 +326,18 @@ export default function SettingsView({
       appendRooms(createdRooms);
     }
 
-    setNewFloorName('');
+    setFloorNameInput('');
     setNewFloorRoomsCount('');
     setModalError(null);
-    setIsAddFloorModalVisible(false);
+    setIsFloorModalVisible(false);
     setStatusNotice(
       createdRooms.length > 0
-        ? `Added ${formatted} with ${createdRooms.length} rooms (${createdRooms[0].roomNumber}${
+        ? `Added ${formatted} with ${createdRooms.length} ${createdRooms.length === 1 ? 'unit' : 'units'} (${createdRooms[0].roomNumber}${
             createdRooms.length > 1
               ? ` to ${createdRooms[createdRooms.length - 1].roomNumber}`
               : ''
           }).`
-        : `Added ${formatted}. First room will default to ${getDefaultNextRoomNumber(
+        : `Added ${formatted}. First unit will default to ${getDefaultNextRoomNumber(
             formatted,
             rooms,
             floorIdx
@@ -289,7 +357,7 @@ export default function SettingsView({
       title: 'Delete Floor',
       message:
         assignedRoomsCount > 0
-          ? `Remove "${floorName}" from Settings? ${assignedRoomsCount} existing rooms on this floor will remain until deleted.`
+          ? `Remove "${floorName}" from Settings? ${assignedRoomsCount} existing ${assignedRoomsCount === 1 ? 'unit' : 'units'} on this floor will remain until deleted.`
           : `Are you sure you want to remove "${floorName}"?`,
       confirmLabel: 'Delete',
       onConfirm: () => {
@@ -300,51 +368,98 @@ export default function SettingsView({
     });
   };
 
-  const handleOpenAddRoomModal = () => {
-    const defaultFloor = floors[0] || 'Floor 1';
-    const floorIdx = Math.max(0, floors.indexOf(defaultFloor));
-    const defaultRoomNo = getDefaultNextRoomNumber(defaultFloor, rooms, floorIdx);
-    setNewRoomFloor(defaultFloor);
-    setNewRoomNumber(defaultRoomNo);
-    setNewWingSuffix('');
-    setNewType(roomTypes[0] || '1 BHK');
-    setNewStatus('Vacant');
-    setNewTenant('');
-    setNewTenantPhone('');
-    setNewRent('');
-    setNewDeposit('');
-    setIsRoomFloorDropdownOpen(false);
-    setIsRoomTypeDropdownOpen(false);
+  // --- ROOM TYPE HANDLERS ---
+  const handleOpenAddRoomTypeModal = () => {
+    setEditingRoomTypeOriginal(null);
+    setRoomTypeNameInput('');
+    setRoomTypeDefaultRentInput('9500');
+    setRoomTypeDefaultDepositInput('19000');
     setModalError(null);
-    setIsAddRoomModalVisible(true);
+    setIsRoomTypeModalVisible(true);
   };
 
-  const handleSelectRoomFloorInModal = (floorName: string) => {
-    const floorIdx = Math.max(
-      0,
-      floors.findIndex((f) => matchesFloorName(f, floorName))
-    );
-    setNewRoomFloor(floorName);
-    setNewRoomNumber(getDefaultNextRoomNumber(floorName, rooms, floorIdx));
-    setIsRoomFloorDropdownOpen(false);
-    if (modalError) setModalError(null);
+  const handleOpenEditRoomTypeModal = (type: string) => {
+    const existingDefaults = getDefaultsForType(type);
+    setEditingRoomTypeOriginal(type);
+    setRoomTypeNameInput(type);
+    setRoomTypeDefaultRentInput(String(parseRupeeAmount(existingDefaults.rent)));
+    setRoomTypeDefaultDepositInput(String(parseRupeeAmount(existingDefaults.deposit)));
+    setModalError(null);
+    setIsRoomTypeModalVisible(true);
   };
 
-  const handleAddRoomType = () => {
-    if (!newRoomTypeText.trim()) {
+  const handleSaveRoomType = () => {
+    const cleanName = roomTypeNameInput.trim();
+    if (!cleanName) {
       setModalError('Please enter a room type (e.g. 4 BHK, Studio, Penthouse).');
       return;
     }
-    if (roomTypes.some((t) => t.toLowerCase() === newRoomTypeText.trim().toLowerCase())) {
+
+    const rentNum = parseRupeeAmount(roomTypeDefaultRentInput);
+    const depNum = parseRupeeAmount(roomTypeDefaultDepositInput);
+    const nextDefaultsEntry: RoomTypeDefaultFinancials = {
+      rent: formatRupeeAmount(rentNum > 0 ? rentNum : 9000),
+      deposit: formatRupeeAmount(depNum > 0 ? depNum : (rentNum > 0 ? rentNum * 2 : 18000)),
+    };
+
+    if (editingRoomTypeOriginal) {
+      const duplicate = roomTypes.some(
+        (t) =>
+          t.toLowerCase() === cleanName.toLowerCase() &&
+          t.toLowerCase() !== editingRoomTypeOriginal.toLowerCase()
+      );
+      if (duplicate) {
+        setModalError('This room type is already in your list.');
+        return;
+      }
+
+      const nextTypes = roomTypes.map((t) => (t === editingRoomTypeOriginal ? cleanName : t));
+      const nextDefaultsMap = { ...roomTypeDefaults };
+      if (editingRoomTypeOriginal !== cleanName) {
+        delete nextDefaultsMap[editingRoomTypeOriginal];
+      }
+      nextDefaultsMap[cleanName] = nextDefaultsEntry;
+
+      void updateSettings({
+        roomTypes: nextTypes,
+        roomTypeDefaults: nextDefaultsMap,
+      });
+
+      if (editingRoomTypeOriginal !== cleanName) {
+        setRoomsList((prev) =>
+          prev.map((rm) =>
+            rm.type.toLowerCase().trim() === editingRoomTypeOriginal.toLowerCase().trim()
+              ? { ...rm, type: cleanName }
+              : rm
+          )
+        );
+      }
+
+      setModalError(null);
+      setIsRoomTypeModalVisible(false);
+      setStatusNotice(`Updated "${cleanName}" defaults (${nextDefaultsEntry.rent} / ${nextDefaultsEntry.deposit}).`);
+      return;
+    }
+
+    if (roomTypes.some((t) => t.toLowerCase() === cleanName.toLowerCase())) {
       setModalError('This room type is already in your list.');
       return;
     }
-    const addedType = newRoomTypeText.trim();
-    setRoomTypes([...roomTypes, addedType]);
-    setNewRoomTypeText('');
+
+    const nextTypes = [...roomTypes, cleanName];
+    const nextDefaultsMap = {
+      ...roomTypeDefaults,
+      [cleanName]: nextDefaultsEntry,
+    };
+
+    void updateSettings({
+      roomTypes: nextTypes,
+      roomTypeDefaults: nextDefaultsMap,
+    });
+    setRoomTypeNameInput('');
     setModalError(null);
-    setIsAddRoomTypeModalVisible(false);
-    setStatusNotice(`"${addedType}" added to room types.`);
+    setIsRoomTypeModalVisible(false);
+    setStatusNotice(`"${cleanName}" added to room types.`);
   };
 
   const handleDeleteRoomType = (roomType: string) => {
@@ -354,31 +469,72 @@ export default function SettingsView({
     }
     setConfirmDialog({
       title: 'Delete Room Type',
-      message: `Are you sure you want to remove "${roomType}"? Existing rooms of this type will remain in your records.`,
+      message: `Are you sure you want to remove "${roomType}"? Existing units of this type will remain in your records.`,
       confirmLabel: 'Delete',
       onConfirm: () => {
-        setRoomTypes(roomTypes.filter((t) => t !== roomType));
+        const nextTypes = roomTypes.filter((t) => t !== roomType);
+        const nextDefaultsMap = { ...roomTypeDefaults };
+        delete nextDefaultsMap[roomType];
+        void updateSettings({
+          roomTypes: nextTypes,
+          roomTypeDefaults: nextDefaultsMap,
+        });
         setStatusNotice(`"${roomType}" removed from room types.`);
         setConfirmDialog(null);
       },
     });
   };
 
-  const handleAddReason = () => {
-    if (!newReasonText.trim()) {
+  // --- MAINTENANCE REASON HANDLERS ---
+  const handleOpenAddReasonModal = () => {
+    setEditingReasonOriginal(null);
+    setReasonNameInput('');
+    setModalError(null);
+    setIsReasonModalVisible(true);
+  };
+
+  const handleOpenEditReasonModal = (reason: string) => {
+    setEditingReasonOriginal(reason);
+    setReasonNameInput(reason);
+    setModalError(null);
+    setIsReasonModalVisible(true);
+  };
+
+  const handleSaveReason = () => {
+    const cleanReason = reasonNameInput.trim();
+    if (!cleanReason) {
       setModalError('Please enter a maintenance reason (e.g. Pest Control).');
       return;
     }
-    if (maintenanceReasons.some((r) => r.toLowerCase() === newReasonText.trim().toLowerCase())) {
+
+    if (editingReasonOriginal) {
+      const duplicate = maintenanceReasons.some(
+        (r) =>
+          r.toLowerCase() === cleanReason.toLowerCase() &&
+          r.toLowerCase() !== editingReasonOriginal.toLowerCase()
+      );
+      if (duplicate) {
+        setModalError('This maintenance reason is already in your list.');
+        return;
+      }
+      setMaintenanceReasons(
+        maintenanceReasons.map((r) => (r === editingReasonOriginal ? cleanReason : r))
+      );
+      setModalError(null);
+      setIsReasonModalVisible(false);
+      setStatusNotice(`Updated "${editingReasonOriginal}" to "${cleanReason}".`);
+      return;
+    }
+
+    if (maintenanceReasons.some((r) => r.toLowerCase() === cleanReason.toLowerCase())) {
       setModalError('This maintenance reason is already in your list.');
       return;
     }
-    const addedReason = newReasonText.trim();
-    setMaintenanceReasons([...maintenanceReasons, addedReason]);
-    setNewReasonText('');
+    setMaintenanceReasons([...maintenanceReasons, cleanReason]);
+    setReasonNameInput('');
     setModalError(null);
-    setIsAddReasonModalVisible(false);
-    setStatusNotice(`"${addedReason}" added to maintenance reasons.`);
+    setIsReasonModalVisible(false);
+    setStatusNotice(`"${cleanReason}" added to maintenance reasons.`);
   };
 
   const handleDeleteReason = (reason: string) => {
@@ -394,20 +550,86 @@ export default function SettingsView({
     });
   };
 
-  const handleCreateRoom = () => {
+  // --- UNIT / ROOM HANDLERS ---
+  const handleOpenAddRoomModal = () => {
+    const defaultFloor = floors[0] || 'Floor 1';
+    const floorIdx = Math.max(0, floors.indexOf(defaultFloor));
+    const defaultRoomNo = getDefaultNextRoomNumber(defaultFloor, rooms, floorIdx);
+    const defaultType = roomTypes[0] || '1 BHK';
+    const typeDefaults = getDefaultsForType(defaultType);
+
+    setEditingRoomId(null);
+    setNewRoomFloor(defaultFloor);
+    setNewRoomNumber(defaultRoomNo);
+    setNewWingSuffix('');
+    setNewType(defaultType);
+    setNewStatus('Vacant');
+    setNewTenant('');
+    setNewTenantPhone('');
+    setNewRent(String(parseRupeeAmount(typeDefaults.rent)));
+    setNewDeposit(String(parseRupeeAmount(typeDefaults.deposit)));
+    setIsRoomFloorDropdownOpen(false);
+    setIsRoomTypeDropdownOpen(false);
+    setModalError(null);
+    setIsRoomModalVisible(true);
+  };
+
+  const handleOpenEditRoomModal = (room: RoomItem) => {
+    const roomFloor = getRoomFloor(room);
+    const wingParts = room.wing.split('·').map((s) => s.trim());
+    const wingSuffix = wingParts.length > 1 ? wingParts.slice(1).join(' · ') : '';
+    const primary = room.members[0];
+
+    setEditingRoomId(room.id);
+    setNewRoomFloor(roomFloor);
+    setNewRoomNumber(room.roomNumber);
+    setNewWingSuffix(wingSuffix);
+    setNewType(room.type);
+    setNewStatus(room.status);
+    setNewTenant(primary?.name ?? '');
+    setNewTenantPhone(primary?.phone ?? '');
+    setNewRent(String(parseRupeeAmount(room.monthlyRent)));
+    setNewDeposit(String(parseRupeeAmount(room.depositAmount)));
+    setIsRoomFloorDropdownOpen(false);
+    setIsRoomTypeDropdownOpen(false);
+    setModalError(null);
+    setIsRoomModalVisible(true);
+  };
+
+  const handleSelectRoomFloorInModal = (floorName: string) => {
+    const floorIdx = Math.max(
+      0,
+      floors.findIndex((f) => matchesFloorName(f, floorName))
+    );
+    setNewRoomFloor(floorName);
+    if (!editingRoomId) {
+      setNewRoomNumber(getDefaultNextRoomNumber(floorName, rooms, floorIdx));
+    }
+    setIsRoomFloorDropdownOpen(false);
+    if (modalError) setModalError(null);
+  };
+
+  const handleSelectRoomTypeInModal = (type: string) => {
+    setNewType(type);
+    const defaults = getDefaultsForType(type);
+    setNewRent(String(parseRupeeAmount(defaults.rent)));
+    setNewDeposit(String(parseRupeeAmount(defaults.deposit)));
+    setIsRoomTypeDropdownOpen(false);
+  };
+
+  const handleSaveRoom = () => {
     const floorIdx = Math.max(
       0,
       floors.findIndex((f) => matchesFloorName(f, newRoomFloor))
     );
     const rawNum =
       newRoomNumber.trim() || getDefaultNextRoomNumber(newRoomFloor, rooms, floorIdx);
-    const formattedRoomNumber = /^room\s+/i.test(rawNum)
-      ? `Room ${rawNum.replace(/^room\s+/i, '').trim()}`
-      : `Room ${rawNum}`;
+    const formattedRoomNumber = normalizeRoomNumberInput(rawNum);
 
     if (
       rooms.some(
         (r) =>
+          r.id !== editingRoomId &&
           matchesFloorName(getRoomFloor(r), newRoomFloor) &&
           r.roomNumber.trim().toLowerCase() === formattedRoomNumber.toLowerCase()
       )
@@ -416,21 +638,72 @@ export default function SettingsView({
       return;
     }
 
+    if (newStatus !== 'Vacant' && !newTenant.trim()) {
+      setModalError('Please enter a primary resident name for an occupied unit.');
+      return;
+    }
+
     const typeSelected = newType.trim() || roomTypes[0] || '1 BHK';
-    const defaults = getDefaultFinancialsForType(typeSelected);
-    const rentFormatted = newRent.trim()
-      ? newRent.trim().startsWith('₹')
-        ? newRent.trim()
-        : `₹${newRent.trim()}`
-      : defaults.rent;
-    const depositFormatted = newDeposit.trim()
-      ? newDeposit.trim().startsWith('₹')
-        ? newDeposit.trim()
-        : `₹${newDeposit.trim()}`
-      : defaults.deposit;
+    const defaults = getDefaultsForType(typeSelected);
+    const rentNum = parseRupeeAmount(newRent);
+    const depositNum = parseRupeeAmount(newDeposit);
+    const rentFormatted = rentNum > 0 ? formatRupeeAmount(rentNum) : defaults.rent;
+    const depositFormatted = depositNum > 0 ? formatRupeeAmount(depositNum) : defaults.deposit;
+    const cleanWingSuffix = newWingSuffix.trim();
+    const wingLabel = cleanWingSuffix ? `${newRoomFloor} · ${cleanWingSuffix}` : newRoomFloor;
+
+    if (editingRoomId) {
+      const existing = rooms.find((r) => r.id === editingRoomId);
+      if (!existing) return;
+
+      let updatedMembers = existing.members;
+      if (newStatus === 'Vacant') {
+        updatedMembers = [];
+      } else if (existing.members.length > 0) {
+        updatedMembers = existing.members.map((m, i) =>
+          i === 0
+            ? {
+                ...m,
+                name: newTenant.trim(),
+                phone: newTenantPhone.trim() || m.phone,
+              }
+            : m
+        );
+      } else {
+        updatedMembers = [
+          {
+            id: `${Date.now()}`,
+            name: newTenant.trim(),
+            role: 'Primary Resident',
+            phone: newTenantPhone.trim() || '+91 98000 00000',
+          },
+        ];
+      }
+
+      const updatedRoom: RoomItem = {
+        ...existing,
+        roomNumber: formattedRoomNumber,
+        floor: newRoomFloor,
+        wing: wingLabel,
+        type: typeSelected,
+        monthlyRent: rentFormatted,
+        depositAmount: depositFormatted,
+        status: newStatus,
+        joinedDate:
+          newStatus === 'Vacant' ? undefined : existing.joinedDate || formatShortDate(),
+        bookingType: newStatus === 'Vacant' ? undefined : existing.bookingType || 'Family',
+        members: updatedMembers,
+      };
+
+      void upsertSingleRoom(updatedRoom);
+      setIsRoomModalVisible(false);
+      setModalError(null);
+      setStatusNotice(`Updated ${updatedRoom.roomNumber} (${updatedRoom.type}).`);
+      return;
+    }
 
     const members: RoomMember[] =
-      newStatus === 'Vacant' || !newTenant.trim()
+      newStatus === 'Vacant'
         ? []
         : [
             {
@@ -441,17 +714,17 @@ export default function SettingsView({
             },
           ];
 
-    const cleanWingSuffix = newWingSuffix.trim();
     const newRoom: RoomItem = {
       id: Date.now().toString(),
       roomNumber: formattedRoomNumber,
       floor: newRoomFloor,
-      wing: cleanWingSuffix ? `${newRoomFloor} · ${cleanWingSuffix}` : newRoomFloor,
+      wing: wingLabel,
       type: typeSelected,
       monthlyRent: rentFormatted,
       depositAmount: depositFormatted,
       status: newStatus,
-      joinedDate: newStatus !== 'Vacant' ? 'Nov 02, 2026' : undefined,
+      joinedDate: newStatus !== 'Vacant' ? formatShortDate() : undefined,
+      bookingType: newStatus !== 'Vacant' ? 'Family' : undefined,
       members,
     };
 
@@ -465,12 +738,38 @@ export default function SettingsView({
     setIsRoomFloorDropdownOpen(false);
     setIsRoomTypeDropdownOpen(false);
     setModalError(null);
-    setIsAddRoomModalVisible(false);
+    setIsRoomModalVisible(false);
     setStatusNotice(`${newRoom.roomNumber} (${newRoom.type}) added to ${newRoomFloor}.`);
   };
 
+  const handleDeleteRoom = (room: RoomItem) => {
+    setConfirmDialog({
+      title: 'Delete Unit',
+      message: `Delete ${room.roomNumber} (${getRoomFloor(room)})? Its rent and deposit records will also be removed.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        void removeRoom(room);
+        setStatusNotice(`${room.roomNumber} deleted.`);
+        setConfirmDialog(null);
+      },
+    });
+  };
+
+  // --- RENT COLLECTION RULES HANDLER ---
   const handleSaveSettings = () => {
-    setStatusNotice('Rental preferences updated.');
+    const parsedLateFee = parseRupeeAmount(lateFee);
+    const formattedLateFee =
+      parsedLateFee > 0 ? formatRupeeAmount(parsedLateFee) : lateFee.trim() || '₹500';
+
+    void updateSettings({
+      rentCycleDay: rentCycleDay.trim() || '1st of month',
+      gracePeriod: gracePeriod.trim() || '5 days',
+      lateFee: formattedLateFee,
+    });
+    setDraftRentCycleDay(null);
+    setDraftGracePeriod(null);
+    setDraftLateFee(null);
+    setStatusNotice('Rental preferences saved and synced.');
   };
 
   const sortedSettingsRooms = React.useMemo(
@@ -492,11 +791,15 @@ export default function SettingsView({
   );
 
   return (
-    <View style={styles.outerScreen}>
+    <KeyboardAvoidingView
+      style={styles.outerScreen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -523,11 +826,13 @@ export default function SettingsView({
             </View>
 
             <TouchableOpacity
-              style={styles.saveHeaderButton}
+              style={[styles.saveHeaderButton, hasUnsavedRuleEdits && styles.saveHeaderButtonActive]}
               onPress={handleSaveSettings}
               activeOpacity={0.85}
             >
-              <Text style={styles.saveHeaderButtonText}>Save</Text>
+              <Text style={styles.saveHeaderButtonText}>
+                {hasUnsavedRuleEdits ? 'Save*' : 'Save'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -571,19 +876,28 @@ export default function SettingsView({
                     <View style={styles.aptDetailsCol}>
                       <Text style={styles.aptNameText}>{floorName}</Text>
                       <Text style={styles.aptSubText}>
-                        {floorRooms.length} {floorRooms.length === 1 ? 'room' : 'rooms'} · Next default: {nextDefaultRoom}
+                        {floorRooms.length} {floorRooms.length === 1 ? 'unit' : 'units'} · Next default: {nextDefaultRoom}
                       </Text>
                     </View>
 
-                    {floors.length > 1 && (
+                    <View style={styles.rowActions}>
                       <TouchableOpacity
-                        style={styles.deleteAptBtn}
+                        style={styles.iconActionBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => handleDeleteFloor(floorName)}
+                        onPress={() => handleOpenEditFloorModal(floorName)}
                       >
-                        <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        <Feather name="edit-2" size={15} color={Palette.primary} />
                       </TouchableOpacity>
-                    )}
+                      {floors.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.iconActionBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => handleDeleteFloor(floorName)}
+                        >
+                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                   {!isLast && <View style={styles.divider} />}
                 </React.Fragment>
@@ -596,10 +910,7 @@ export default function SettingsView({
             <Text style={styles.sectionTitle}>ROOM TYPES ({roomTypes.length})</Text>
             <TouchableOpacity
               style={styles.addAptButton}
-              onPress={() => {
-                setModalError(null);
-                setIsAddRoomTypeModalVisible(true);
-              }}
+              onPress={handleOpenAddRoomTypeModal}
               activeOpacity={0.7}
             >
               <Feather name="plus" size={Typography.iconSize.sm} color={Palette.accentText} style={{ marginRight: 4 }} />
@@ -607,7 +918,6 @@ export default function SettingsView({
             </TouchableOpacity>
           </View>
 
-          {/* Room Types Cards List */}
           <View style={styles.apartmentsCard}>
             {roomTypes.map((type, idx) => {
               const isLast = idx === roomTypes.length - 1;
@@ -616,6 +926,7 @@ export default function SettingsView({
                   r.type.toLowerCase().trim() === type.toLowerCase().trim() ||
                   r.type.toLowerCase().includes(type.toLowerCase())
               ).length;
+              const typeDefaults = getDefaultsForType(type);
 
               return (
                 <React.Fragment key={type}>
@@ -627,19 +938,28 @@ export default function SettingsView({
                     <View style={styles.aptDetailsCol}>
                       <Text style={styles.aptNameText}>{type}</Text>
                       <Text style={styles.aptSubText}>
-                        {countForType} {countForType === 1 ? 'room' : 'rooms'} configured
+                        {countForType} {countForType === 1 ? 'unit' : 'units'} · Default {typeDefaults.rent} / {typeDefaults.deposit}
                       </Text>
                     </View>
 
-                    {roomTypes.length > 1 && (
+                    <View style={styles.rowActions}>
                       <TouchableOpacity
-                        style={styles.deleteAptBtn}
+                        style={styles.iconActionBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => handleDeleteRoomType(type)}
+                        onPress={() => handleOpenEditRoomTypeModal(type)}
                       >
-                        <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        <Feather name="edit-2" size={15} color={Palette.primary} />
                       </TouchableOpacity>
-                    )}
+                      {roomTypes.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.iconActionBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => handleDeleteRoomType(type)}
+                        >
+                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                   {!isLast && <View style={styles.divider} />}
                 </React.Fragment>
@@ -647,57 +967,83 @@ export default function SettingsView({
             })}
           </View>
 
-          {/* Section: Rooms Management (Add rooms here to show in Rooms page) */}
+          {/* Section: Units Management */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>ROOMS LIST ({rooms.length})</Text>
+            <Text style={styles.sectionTitle}>UNITS LIST ({rooms.length})</Text>
             <TouchableOpacity
               style={styles.addAptButton}
               onPress={handleOpenAddRoomModal}
               activeOpacity={0.7}
             >
               <Feather name="plus" size={Typography.iconSize.sm} color={Palette.accentText} style={{ marginRight: 4 }} />
-              <Text style={styles.addAptButtonText}>Add Room</Text>
+              <Text style={styles.addAptButtonText}>Add Unit</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Rooms Cards List in Settings */}
           <View style={styles.apartmentsCard}>
-            {sortedSettingsRooms.map((rm, idx) => {
-              const isLast = idx === sortedSettingsRooms.length - 1;
-              const isOccupied = rm.status === 'Occupied';
-              const isRentDue = rm.status === 'Rent due';
-              const isVacant = rm.status === 'Vacant';
-              return (
-                <React.Fragment key={rm.id}>
-                  <View style={styles.apartmentItemRow}>
-                    <View style={styles.aptIconCircle}>
-                      <MaterialCommunityIcons name="door-open" size={20} color={Palette.accentText} />
-                    </View>
+            {sortedSettingsRooms.length === 0 ? (
+              <View style={styles.emptySettingsRow}>
+                <Text style={styles.emptySettingsText}>
+                  No units configured yet. Tap + Add Unit to create one.
+                </Text>
+              </View>
+            ) : (
+              sortedSettingsRooms.map((rm, idx) => {
+                const isLast = idx === sortedSettingsRooms.length - 1;
+                const isOccupied = rm.status === 'Occupied';
+                const isRentDue = rm.status === 'Rent due';
+                const isVacant = rm.status === 'Vacant';
+                return (
+                  <React.Fragment key={rm.id}>
+                    <View style={styles.apartmentItemRow}>
+                      <View style={styles.aptIconCircle}>
+                        <MaterialCommunityIcons name="door-open" size={20} color={Palette.accentText} />
+                      </View>
 
-                    <View style={styles.aptDetailsCol}>
-                      <View style={styles.aptTitleRow}>
-                        <Text style={styles.aptNameText}>{rm.roomNumber}</Text>
-                        <Text
-                          style={[
-                            styles.roomStatusTag,
-                            isOccupied && { color: Palette.status.occupied.text },
-                            isRentDue && { color: Palette.status.due.text },
-                            isVacant && { color: Palette.status.vacant.text },
-                          ]}
-                        >
-                          {rm.status}
+                      <View style={styles.aptDetailsCol}>
+                        <View style={styles.aptTitleRow}>
+                          <Text style={styles.aptNameText}>{rm.roomNumber}</Text>
+                          <Text
+                            style={[
+                              styles.roomStatusTag,
+                              isOccupied && { color: Palette.status.occupied.text },
+                              isRentDue && { color: Palette.status.due.text },
+                              isVacant && { color: Palette.status.vacant.text },
+                            ]}
+                          >
+                            {rm.status}
+                          </Text>
+                        </View>
+                        <Text style={styles.aptSubText}>
+                          {getRoomFloor(rm)} · {rm.type}
+                        </Text>
+                        <Text style={styles.aptRoomsText}>
+                          Rent: {rm.monthlyRent} · Deposit: {rm.depositAmount}
                         </Text>
                       </View>
-                      <Text style={styles.aptSubText}>
-                        {getRoomFloor(rm)} · {rm.type}
-                      </Text>
-                      <Text style={styles.aptRoomsText}>Rent: {rm.monthlyRent}</Text>
+
+                      <View style={styles.rowActions}>
+                        <TouchableOpacity
+                          style={styles.iconActionBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => handleOpenEditRoomModal(rm)}
+                        >
+                          <Feather name="edit-2" size={15} color={Palette.primary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.iconActionBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => handleDeleteRoom(rm)}
+                        >
+                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                  {!isLast && <View style={styles.divider} />}
-                </React.Fragment>
-              );
-            })}
+                    {!isLast && <View style={styles.divider} />}
+                  </React.Fragment>
+                );
+              })
+            )}
           </View>
 
           {/* Section: Maintenance Reasons */}
@@ -705,10 +1051,7 @@ export default function SettingsView({
             <Text style={styles.sectionTitle}>MAINTENANCE REASONS ({maintenanceReasons.length})</Text>
             <TouchableOpacity
               style={styles.addAptButton}
-              onPress={() => {
-                setModalError(null);
-                setIsAddReasonModalVisible(true);
-              }}
+              onPress={handleOpenAddReasonModal}
               activeOpacity={0.7}
             >
               <Feather name="plus" size={Typography.iconSize.sm} color={Palette.accentText} style={{ marginRight: 4 }} />
@@ -716,7 +1059,6 @@ export default function SettingsView({
             </TouchableOpacity>
           </View>
 
-          {/* Reasons Cards List */}
           <View style={styles.apartmentsCard}>
             {maintenanceReasons.map((reason, idx) => {
               const isLast = idx === maintenanceReasons.length - 1;
@@ -729,18 +1071,27 @@ export default function SettingsView({
 
                     <View style={styles.aptDetailsCol}>
                       <Text style={styles.aptNameText}>{reason}</Text>
-                      <Text style={styles.aptSubText}>Available in Maintenance Dropdown</Text>
+                      <Text style={styles.aptSubText}>Available in Maintenance Categories</Text>
                     </View>
 
-                    {maintenanceReasons.length > 1 && (
+                    <View style={styles.rowActions}>
                       <TouchableOpacity
-                        style={styles.deleteAptBtn}
+                        style={styles.iconActionBtn}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        onPress={() => handleDeleteReason(reason)}
+                        onPress={() => handleOpenEditReasonModal(reason)}
                       >
-                        <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        <Feather name="edit-2" size={15} color={Palette.primary} />
                       </TouchableOpacity>
-                    )}
+                      {maintenanceReasons.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.iconActionBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          onPress={() => handleDeleteReason(reason)}
+                        >
+                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                   {!isLast && <View style={styles.divider} />}
                 </React.Fragment>
@@ -753,20 +1104,64 @@ export default function SettingsView({
             <Text style={styles.sectionHeader}>RENT COLLECTION RULES</Text>
 
             <Text style={styles.fieldLabel}>Rent Due Cycle</Text>
+            <View style={styles.presetChipsRow}>
+              {RENT_CYCLE_PRESETS.map((preset) => {
+                const active = rentCycleDay.trim().toLowerCase() === preset.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[styles.presetChip, active && styles.presetChipActive]}
+                    onPress={() => {
+                      setDraftRentCycleDay(null);
+                      void updateSettings({ rentCycleDay: preset });
+                      setStatusNotice(`Rent due cycle set to ${preset}.`);
+                    }}
+                  >
+                    <Text style={[styles.presetChipText, active && styles.presetChipTextActive]}>
+                      {preset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <TextInput
               style={styles.textInput}
               value={rentCycleDay}
-              onChangeText={setRentCycleDay}
+              onChangeText={setDraftRentCycleDay}
+              placeholder="e.g. 1st of month"
               placeholderTextColor={Palette.textMuted}
             />
 
+            <Text style={styles.fieldLabel}>Grace Period</Text>
+            <View style={styles.presetChipsRow}>
+              {GRACE_PERIOD_PRESETS.map((preset) => {
+                const active = gracePeriod.trim().toLowerCase() === preset.toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={preset}
+                    style={[styles.presetChip, active && styles.presetChipActive]}
+                    onPress={() => {
+                      setDraftGracePeriod(null);
+                      void updateSettings({ gracePeriod: preset });
+                      setStatusNotice(`Grace period set to ${preset}.`);
+                    }}
+                  >
+                    <Text style={[styles.presetChipText, active && styles.presetChipTextActive]}>
+                      {preset}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
             <View style={styles.twoColRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Grace Period</Text>
+                <Text style={styles.fieldLabel}>Custom Grace Period</Text>
                 <TextInput
                   style={styles.textInput}
                   value={gracePeriod}
-                  onChangeText={setGracePeriod}
+                  onChangeText={setDraftGracePeriod}
+                  placeholder="e.g. 5 days"
                   placeholderTextColor={Palette.textMuted}
                 />
               </View>
@@ -776,7 +1171,8 @@ export default function SettingsView({
                 <TextInput
                   style={styles.textInput}
                   value={lateFee}
-                  onChangeText={setLateFee}
+                  onChangeText={setDraftLateFee}
+                  placeholder="e.g. ₹500"
                   placeholderTextColor={Palette.textMuted}
                 />
               </View>
@@ -790,11 +1186,15 @@ export default function SettingsView({
             <View style={styles.switchRow}>
               <View style={styles.switchTextCol}>
                 <Text style={styles.switchTitle}>WhatsApp Rent Reminders</Text>
-                <Text style={styles.switchSub}>Automated notice 3 days before rent due</Text>
+                <Text style={styles.switchSub}>
+                  {autoReminder
+                    ? `Active · Notice 3 days before ${rentCycleDay}`
+                    : 'Paused · Tap to enable monthly reminders'}
+                </Text>
               </View>
               <Switch
                 value={autoReminder}
-                onValueChange={setAutoReminder}
+                onValueChange={(val) => void updateSettings({ autoReminder: val })}
                 trackColor={{ false: Palette.border, true: Palette.primary }}
                 thumbColor={Palette.surface}
               />
@@ -805,38 +1205,101 @@ export default function SettingsView({
             <View style={styles.switchRow}>
               <View style={styles.switchTextCol}>
                 <Text style={styles.switchTitle}>Maintenance Task Status</Text>
-                <Text style={styles.switchSub}>Push updates when repair staff completes work</Text>
+                <Text style={styles.switchSub}>
+                  {maintenanceNotify
+                    ? 'Active · Push updates when repair work completes'
+                    : 'Paused · Tap to enable repair status alerts'}
+                </Text>
               </View>
               <Switch
                 value={maintenanceNotify}
-                onValueChange={setMaintenanceNotify}
+                onValueChange={(val) => void updateSettings({ maintenanceNotify: val })}
                 trackColor={{ false: Palette.border, true: Palette.primary }}
                 thumbColor={Palette.surface}
               />
             </View>
           </View>
+
+          {/* Workspace Data Management */}
+          <View style={styles.card}>
+            <Text style={styles.sectionHeader}>WORKSPACE DATA</Text>
+
+            <TouchableOpacity
+              style={styles.switchRow}
+              activeOpacity={0.75}
+              onPress={() =>
+                setConfirmDialog({
+                  title: 'Restore Sample Data',
+                  message:
+                    'Replace current units, rent ledger, transactions, and notifications with default sample property data?',
+                  confirmLabel: 'Restore',
+                  onConfirm: () => {
+                    setConfirmDialog(null);
+                    void restoreSampleWorkspaceData();
+                    setStatusNotice('Sample property data restored.');
+                  },
+                })
+              }
+            >
+              <View style={styles.switchTextCol}>
+                <Text style={styles.switchTitle}>Restore Sample Property Data</Text>
+                <Text style={styles.switchSub}>Populate units, rent history, and transactions</Text>
+              </View>
+              <Feather name="refresh-cw" size={Typography.iconSize.sm} color={Palette.primary} />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
+            <TouchableOpacity
+              style={styles.switchRow}
+              activeOpacity={0.75}
+              onPress={() =>
+                setConfirmDialog({
+                  title: 'Clear All Data',
+                  message:
+                    'Delete all units, rent records, deposits, transactions, and notifications to start with a blank building?',
+                  confirmLabel: 'Clear All',
+                  onConfirm: () => {
+                    setConfirmDialog(null);
+                    void clearAllWorkspaceData();
+                    setStatusNotice('All workspace records cleared.');
+                  },
+                })
+              }
+            >
+              <View style={styles.switchTextCol}>
+                <Text style={[styles.switchTitle, { color: Palette.status.overdue.text }]}>
+                  Start With Blank Workspace
+                </Text>
+                <Text style={styles.switchSub}>Clear sample units & records to add your own</Text>
+              </View>
+              <Feather name="trash-2" size={Typography.iconSize.sm} color={Palette.status.overdue.text} />
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
 
-      {/* Add Floor Modal */}
+      {/* Add / Edit Floor Modal */}
       <Modal
-        visible={isAddFloorModalVisible}
+        visible={isFloorModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsAddFloorModalVisible(false)}
+        onRequestClose={() => setIsFloorModalVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <TouchableWithoutFeedback onPress={() => setIsAddFloorModalVisible(false)}>
+          <TouchableWithoutFeedback onPress={() => setIsFloorModalVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Floor</Text>
-              <TouchableOpacity onPress={() => setIsAddFloorModalVisible(false)}>
+              <Text style={styles.modalTitle}>
+                {editingFloorOriginal ? 'Rename Floor' : 'Add Floor'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsFloorModalVisible(false)}>
                 <Feather name="x" size={20} color={Palette.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -853,146 +1316,159 @@ export default function SettingsView({
                 style={styles.inputField}
                 placeholder="e.g. Floor 4, Ground Floor"
                 placeholderTextColor={Palette.textMuted}
-                value={newFloorName}
+                value={floorNameInput}
                 onChangeText={(txt) => {
-                  setNewFloorName(txt);
+                  setFloorNameInput(txt);
                   if (modalError) setModalError(null);
                 }}
               />
 
-              <Text style={styles.inputLabel}>Initial Rooms on Floor (Optional)</Text>
-              <TextInput
-                style={styles.inputField}
-                placeholder="e.g. 3 (auto-sets Room 401, 402...)"
-                placeholderTextColor={Palette.textMuted}
-                keyboardType="numeric"
-                value={newFloorRoomsCount}
-                onChangeText={(txt) => {
-                  setNewFloorRoomsCount(txt);
-                  if (modalError) setModalError(null);
-                }}
-              />
-
-              {(parseInt(newFloorRoomsCount.trim(), 10) || 0) > 0 && (
+              {!editingFloorOriginal && (
                 <>
-                  <Text style={styles.inputLabel}>Default Room Type</Text>
-                  <View style={styles.chipsWrap}>
-                    {roomTypes.map((type) => {
-                      const active = newFloorDefaultType === type;
-                      return (
-                        <TouchableOpacity
-                          key={type}
-                          style={[styles.typeChip, active && styles.typeChipActive]}
-                          onPress={() => setNewFloorDefaultType(type)}
-                        >
-                          <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                            {type}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  <Text style={styles.inputLabel}>Initial Units on Floor (Optional)</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="e.g. 3 (auto-sets Room 401, 402...)"
+                    placeholderTextColor={Palette.textMuted}
+                    keyboardType="numeric"
+                    value={newFloorRoomsCount}
+                    onChangeText={(txt) => {
+                      setNewFloorRoomsCount(txt);
+                      if (modalError) setModalError(null);
+                    }}
+                  />
 
-                  <View style={styles.twoColRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>Rent (₹)</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        placeholder="e.g. 9500"
-                        placeholderTextColor={Palette.textMuted}
-                        keyboardType="numeric"
-                        value={newFloorRent}
-                        onChangeText={setNewFloorRent}
-                      />
-                    </View>
-                    <View style={{ width: 12 }} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.inputLabel}>Deposit (₹)</Text>
-                      <TextInput
-                        style={styles.inputField}
-                        placeholder="e.g. 19000"
-                        placeholderTextColor={Palette.textMuted}
-                        keyboardType="numeric"
-                        value={newFloorDeposit}
-                        onChangeText={setNewFloorDeposit}
-                      />
-                    </View>
-                  </View>
+                  {(parseInt(newFloorRoomsCount.trim(), 10) || 0) > 0 && (
+                    <>
+                      <Text style={styles.inputLabel}>Default Room Type</Text>
+                      <View style={styles.chipsWrap}>
+                        {roomTypes.map((type) => {
+                          const active = newFloorDefaultType === type;
+                          return (
+                            <TouchableOpacity
+                              key={type}
+                              style={[styles.typeChip, active && styles.typeChipActive]}
+                              onPress={() => {
+                                const d = getDefaultsForType(type);
+                                setNewFloorDefaultType(type);
+                                setNewFloorRent(String(parseRupeeAmount(d.rent)));
+                                setNewFloorDeposit(String(parseRupeeAmount(d.deposit)));
+                              }}
+                            >
+                              <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
+                                {type}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <View style={styles.twoColRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.inputLabel}>Rent (₹)</Text>
+                          <TextInput
+                            style={styles.inputField}
+                            placeholder="e.g. 9500"
+                            placeholderTextColor={Palette.textMuted}
+                            keyboardType="numeric"
+                            value={newFloorRent}
+                            onChangeText={setNewFloorRent}
+                          />
+                        </View>
+                        <View style={{ width: 12 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.inputLabel}>Deposit (₹)</Text>
+                          <TextInput
+                            style={styles.inputField}
+                            placeholder="e.g. 19000"
+                            placeholderTextColor={Palette.textMuted}
+                            keyboardType="numeric"
+                            value={newFloorDeposit}
+                            onChangeText={setNewFloorDeposit}
+                          />
+                        </View>
+                      </View>
+                    </>
+                  )}
+
+                  {(() => {
+                    const formatted = formatFloorLabel(floorNameInput) || 'New Floor';
+                    const parsedCount = newFloorRoomsCount.trim()
+                      ? parseInt(newFloorRoomsCount.trim(), 10)
+                      : 0;
+                    const safeCount =
+                      !Number.isNaN(parsedCount) && parsedCount > 0
+                        ? Math.min(parsedCount, 50)
+                        : 0;
+                    const previewRooms: string[] = [];
+                    if (safeCount > 0) {
+                      const tempRooms = [...rooms];
+                      for (let i = 0; i < Math.min(safeCount, 4); i++) {
+                        const num = getDefaultNextRoomNumber(formatted, tempRooms, floors.length);
+                        previewRooms.push(num);
+                        tempRooms.push({
+                          id: `preview-${i}`,
+                          roomNumber: num,
+                          floor: formatted,
+                          wing: formatted,
+                          type: newFloorDefaultType,
+                          monthlyRent: '₹9,000',
+                          depositAmount: '₹18,000',
+                          status: 'Vacant',
+                          members: [],
+                        });
+                      }
+                    }
+                    const nextSingle = getDefaultNextRoomNumber(formatted, rooms, floors.length);
+                    return (
+                      <View style={styles.floorPreviewBox}>
+                        <Feather name="info" size={Typography.iconSize.sm} color={Palette.accentText} />
+                        <Text style={styles.floorPreviewText}>
+                          {safeCount > 0
+                            ? `Will create ${safeCount} vacant units: ${previewRooms.join(', ')}${safeCount > 4 ? '...' : ''}`
+                            : `First default unit on ${formatted}: ${nextSingle}`}
+                        </Text>
+                      </View>
+                    );
+                  })()}
                 </>
               )}
-
-              {(() => {
-                const formatted = formatFloorLabel(newFloorName) || 'New Floor';
-                const parsedCount = newFloorRoomsCount.trim()
-                  ? parseInt(newFloorRoomsCount.trim(), 10)
-                  : 0;
-                const safeCount =
-                  !Number.isNaN(parsedCount) && parsedCount > 0
-                    ? Math.min(parsedCount, 50)
-                    : 0;
-                const previewRooms: string[] = [];
-                if (safeCount > 0) {
-                  const tempRooms = [...rooms];
-                  for (let i = 0; i < Math.min(safeCount, 4); i++) {
-                    const num = getDefaultNextRoomNumber(formatted, tempRooms, floors.length);
-                    previewRooms.push(num);
-                    tempRooms.push({
-                      id: `preview-${i}`,
-                      roomNumber: num,
-                      floor: formatted,
-                      wing: formatted,
-                      type: newFloorDefaultType,
-                      monthlyRent: '₹9,000',
-                      depositAmount: '₹18,000',
-                      status: 'Vacant',
-                      members: [],
-                    });
-                  }
-                }
-                const nextSingle = getDefaultNextRoomNumber(formatted, rooms, floors.length);
-                return (
-                  <View style={styles.floorPreviewBox}>
-                    <Feather name="info" size={Typography.iconSize.sm} color={Palette.accentText} />
-                    <Text style={styles.floorPreviewText}>
-                      {safeCount > 0
-                        ? `Will create ${safeCount} vacant rooms: ${previewRooms.join(', ')}${safeCount > 4 ? '...' : ''}`
-                        : `First default room on ${formatted}: ${nextSingle}`}
-                    </Text>
-                  </View>
-                );
-              })()}
 
               <TouchableOpacity
                 style={styles.saveAptBtn}
                 activeOpacity={0.85}
-                onPress={handleAddFloor}
+                onPress={handleSaveFloor}
               >
-                <Text style={styles.saveAptBtnText}>Save Floor</Text>
+                <Text style={styles.saveAptBtnText}>
+                  {editingFloorOriginal ? 'Update Floor' : 'Save Floor'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Room Modal (Auto-sets default room number based on selected floor) */}
+      {/* Add / Edit Unit Modal */}
       <Modal
-        visible={isAddRoomModalVisible}
+        visible={isRoomModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsAddRoomModalVisible(false)}
+        onRequestClose={() => setIsRoomModalVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <TouchableWithoutFeedback onPress={() => setIsAddRoomModalVisible(false)}>
+          <TouchableWithoutFeedback onPress={() => setIsRoomModalVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Room</Text>
-              <TouchableOpacity onPress={() => setIsAddRoomModalVisible(false)}>
+              <Text style={styles.modalTitle}>
+                {editingRoomId ? 'Edit Unit' : 'Add New Unit'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsRoomModalVisible(false)}>
                 <Feather name="x" size={20} color={Palette.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -1050,7 +1526,7 @@ export default function SettingsView({
                 </View>
               )}
 
-              <Text style={styles.inputLabel}>Room Number (Default Based on Floor) *</Text>
+              <Text style={styles.inputLabel}>Unit Number *</Text>
               <TextInput
                 style={styles.inputField}
                 placeholder={suggestedRoomNumInModal}
@@ -1061,9 +1537,11 @@ export default function SettingsView({
                   if (modalError) setModalError(null);
                 }}
               />
-              <Text style={styles.fieldHintText}>
-                Default for {newRoomFloor} ({selectedFloorCountInModal} existing rooms): {suggestedRoomNumInModal}
-              </Text>
+              {!editingRoomId && (
+                <Text style={styles.fieldHintText}>
+                  Default for {newRoomFloor} ({selectedFloorCountInModal} existing units): {suggestedRoomNumInModal}
+                </Text>
+              )}
 
               <Text style={styles.inputLabel}>Wing (Optional)</Text>
               <TextInput
@@ -1102,10 +1580,7 @@ export default function SettingsView({
                         <TouchableOpacity
                           key={type}
                           style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
-                          onPress={() => {
-                            setNewType(type);
-                            setIsRoomTypeDropdownOpen(false);
-                          }}
+                          onPress={() => handleSelectRoomTypeInModal(type)}
                         >
                           <Text
                             style={[
@@ -1127,14 +1602,20 @@ export default function SettingsView({
 
               <Text style={styles.inputLabel}>Status</Text>
               <View style={styles.statusSelectRow}>
-                {(['Occupied', 'Vacant'] as const).map((st) => (
+                {(editingRoomId
+                  ? (['Occupied', 'Rent due', 'Vacant'] as const)
+                  : (['Occupied', 'Vacant'] as const)
+                ).map((st) => (
                   <TouchableOpacity
                     key={st}
                     style={[
                       styles.statusSelectBtn,
                       newStatus === st && styles.statusSelectBtnActive,
                     ]}
-                    onPress={() => setNewStatus(st)}
+                    onPress={() => {
+                      setNewStatus(st);
+                      if (modalError) setModalError(null);
+                    }}
                   >
                     <Text
                       style={[
@@ -1150,13 +1631,16 @@ export default function SettingsView({
 
               {newStatus !== 'Vacant' && (
                 <>
-                  <Text style={styles.inputLabel}>Primary Resident Name</Text>
+                  <Text style={styles.inputLabel}>Primary Resident Name *</Text>
                   <TextInput
                     style={styles.inputField}
                     placeholder="e.g. Ramesh Kumar"
                     placeholderTextColor={Palette.textMuted}
                     value={newTenant}
-                    onChangeText={setNewTenant}
+                    onChangeText={(txt) => {
+                      setNewTenant(txt);
+                      if (modalError) setModalError(null);
+                    }}
                   />
 
                   <Text style={styles.inputLabel}>Resident Phone</Text>
@@ -1171,57 +1655,67 @@ export default function SettingsView({
                 </>
               )}
 
-              <Text style={styles.inputLabel}>Monthly Rent (₹)</Text>
-              <TextInput
-                style={styles.inputField}
-                placeholder="e.g. 9500"
-                placeholderTextColor={Palette.textMuted}
-                keyboardType="numeric"
-                value={newRent}
-                onChangeText={setNewRent}
-              />
-
-              <Text style={styles.inputLabel}>Security Deposit (₹)</Text>
-              <TextInput
-                style={styles.inputField}
-                placeholder="e.g. 19000"
-                placeholderTextColor={Palette.textMuted}
-                keyboardType="numeric"
-                value={newDeposit}
-                onChangeText={setNewDeposit}
-              />
+              <View style={styles.twoColRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Monthly Rent (₹)</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="e.g. 9500"
+                    placeholderTextColor={Palette.textMuted}
+                    keyboardType="numeric"
+                    value={newRent}
+                    onChangeText={setNewRent}
+                  />
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Security Deposit (₹)</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="e.g. 19000"
+                    placeholderTextColor={Palette.textMuted}
+                    keyboardType="numeric"
+                    value={newDeposit}
+                    onChangeText={setNewDeposit}
+                  />
+                </View>
+              </View>
 
               <TouchableOpacity
                 style={styles.saveAptBtn}
                 activeOpacity={0.85}
-                onPress={handleCreateRoom}
+                onPress={handleSaveRoom}
               >
-                <Text style={styles.saveAptBtnText}>Save Room</Text>
+                <Text style={styles.saveAptBtnText}>
+                  {editingRoomId ? 'Update Unit' : 'Save Unit'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Maintenance Reason Modal */}
+      {/* Add / Edit Maintenance Reason Modal */}
       <Modal
-        visible={isAddReasonModalVisible}
+        visible={isReasonModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsAddReasonModalVisible(false)}
+        onRequestClose={() => setIsReasonModalVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <TouchableWithoutFeedback onPress={() => setIsAddReasonModalVisible(false)}>
+          <TouchableWithoutFeedback onPress={() => setIsReasonModalVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Maintenance Reason</Text>
-              <TouchableOpacity onPress={() => setIsAddReasonModalVisible(false)}>
+              <Text style={styles.modalTitle}>
+                {editingReasonOriginal ? 'Edit Maintenance Reason' : 'Add Maintenance Reason'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsReasonModalVisible(false)}>
                 <Feather name="x" size={20} color={Palette.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -1238,9 +1732,9 @@ export default function SettingsView({
                 style={styles.inputField}
                 placeholder="e.g. Pest Control, Window repair"
                 placeholderTextColor={Palette.textMuted}
-                value={newReasonText}
+                value={reasonNameInput}
                 onChangeText={(txt) => {
-                  setNewReasonText(txt);
+                  setReasonNameInput(txt);
                   if (modalError) setModalError(null);
                 }}
               />
@@ -1248,34 +1742,38 @@ export default function SettingsView({
               <TouchableOpacity
                 style={styles.saveAptBtn}
                 activeOpacity={0.85}
-                onPress={handleAddReason}
+                onPress={handleSaveReason}
               >
-                <Text style={styles.saveAptBtnText}>Save Reason</Text>
+                <Text style={styles.saveAptBtnText}>
+                  {editingReasonOriginal ? 'Update Reason' : 'Save Reason'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add Room Type Modal */}
+      {/* Add / Edit Room Type Modal */}
       <Modal
-        visible={isAddRoomTypeModalVisible}
+        visible={isRoomTypeModalVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setIsAddRoomTypeModalVisible(false)}
+        onRequestClose={() => setIsRoomTypeModalVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <TouchableWithoutFeedback onPress={() => setIsAddRoomTypeModalVisible(false)}>
+          <TouchableWithoutFeedback onPress={() => setIsRoomTypeModalVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
 
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add Room Type</Text>
-              <TouchableOpacity onPress={() => setIsAddRoomTypeModalVisible(false)}>
+              <Text style={styles.modalTitle}>
+                {editingRoomTypeOriginal ? 'Edit Room Type' : 'Add Room Type'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsRoomTypeModalVisible(false)}>
                 <Feather name="x" size={20} color={Palette.textSecondary} />
               </TouchableOpacity>
             </View>
@@ -1292,20 +1790,48 @@ export default function SettingsView({
                 style={styles.inputField}
                 placeholder="e.g. 4 BHK, Penthouse, Duplex"
                 placeholderTextColor={Palette.textMuted}
-                value={newRoomTypeText}
+                value={roomTypeNameInput}
                 onChangeText={(txt) => {
-                  setNewRoomTypeText(txt);
+                  setRoomTypeNameInput(txt);
                   if (modalError) setModalError(null);
                 }}
                 autoFocus
               />
 
+              <View style={styles.twoColRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Default Rent (₹)</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="e.g. 9500"
+                    placeholderTextColor={Palette.textMuted}
+                    keyboardType="numeric"
+                    value={roomTypeDefaultRentInput}
+                    onChangeText={setRoomTypeDefaultRentInput}
+                  />
+                </View>
+                <View style={{ width: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Default Deposit (₹)</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder="e.g. 19000"
+                    placeholderTextColor={Palette.textMuted}
+                    keyboardType="numeric"
+                    value={roomTypeDefaultDepositInput}
+                    onChangeText={setRoomTypeDefaultDepositInput}
+                  />
+                </View>
+              </View>
+
               <TouchableOpacity
                 style={styles.saveAptBtn}
                 activeOpacity={0.85}
-                onPress={handleAddRoomType}
+                onPress={handleSaveRoomType}
               >
-                <Text style={styles.saveAptBtnText}>Save Room Type</Text>
+                <Text style={styles.saveAptBtnText}>
+                  {editingRoomTypeOriginal ? 'Update Room Type' : 'Save Room Type'}
+                </Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1345,7 +1871,7 @@ export default function SettingsView({
           ) : null}
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -1377,15 +1903,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
@@ -1403,6 +1924,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 5,
+  },
+  saveHeaderButtonActive: {
+    backgroundColor: Palette.secondary,
   },
   saveHeaderButtonText: {
     color: Palette.onPrimary,
@@ -1463,6 +1987,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     marginBottom: 16,
   },
+  emptySettingsRow: {
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  emptySettingsText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.textSecondary,
+    textAlign: 'center',
+  },
   apartmentItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1481,6 +2014,7 @@ const styles = StyleSheet.create({
   },
   aptDetailsCol: {
     flex: 1,
+    paddingRight: 8,
   },
   aptTitleRow: {
     flexDirection: 'row',
@@ -1503,7 +2037,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Palette.accentText,
   },
-  deleteAptBtn: {
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  iconActionBtn: {
     padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1529,6 +2068,32 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     marginBottom: 6,
     marginTop: 6,
+  },
+  presetChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  presetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    backgroundColor: Palette.background,
+  },
+  presetChipActive: {
+    backgroundColor: Palette.primary,
+    borderColor: Palette.primary,
+  },
+  presetChipText: {
+    fontSize: Typography.fontSize.caption,
+    fontWeight: '600',
+    color: Palette.textSecondary,
+  },
+  presetChipTextActive: {
+    color: Palette.onPrimary,
   },
   textInput: {
     backgroundColor: Palette.surface,

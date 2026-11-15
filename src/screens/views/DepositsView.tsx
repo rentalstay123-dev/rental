@@ -14,37 +14,24 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
-import { INITIAL_ROOMS, RoomItem, sortRoomNumbers } from './RoomsView';
+import { useAppData } from '../../context/AppDataContext';
+import type {
+  DepositHistoryEntry,
+  DepositPaymentMode,
+  DepositStatus,
+  RoomDepositOverride,
+  RoomItem,
+} from '../../types/appData';
+import { formatShortDate } from '../../utils/finance';
+import { sortRoomNumbers } from './RoomsView';
 
 interface DepositsViewProps {
   onBack?: () => void;
   rooms?: RoomItem[];
 }
 
-export type DepositStatus = 'Held' | 'Refunded' | 'No Deposit';
+export type { DepositStatus };
 type DepositFilter = 'All' | 'Held' | 'Refunded';
-type DepositPaymentMode = 'UPI' | 'Bank Transfer' | 'Cash' | 'Net Banking';
-
-interface DepositHistoryEntry {
-  id: string;
-  title: string;
-  amount: string;
-  date: string;
-  mode: DepositPaymentMode | 'Deduction';
-  note?: string;
-}
-
-interface RoomDepositOverride {
-  amount: string;
-  numericAmount: number;
-  deductedAmount: string;
-  numericDeducted: number;
-  dateReceived: string;
-  dateRefunded?: string;
-  paymentMode: DepositPaymentMode;
-  status: DepositStatus;
-  history: DepositHistoryEntry[];
-}
 
 interface ResolvedRoomDeposit {
   room: RoomItem;
@@ -64,7 +51,7 @@ interface ResolvedRoomDeposit {
 const PAYMENT_MODES: DepositPaymentMode[] = ['UPI', 'Bank Transfer', 'Cash', 'Net Banking'];
 
 let nextDepositSeq = 200;
-const getNextDepositHistoryId = () => `dep-h-${++nextDepositSeq}`;
+const getNextDepositHistoryId = () => `dep-h-${Date.now()}-${++nextDepositSeq}`;
 
 function parseRupeeAmount(raw: string): number {
   return parseInt(raw.replace(/[^0-9]/g, ''), 10) || 0;
@@ -87,9 +74,15 @@ function getDepositStatusColor(status: DepositStatus): string {
 }
 
 export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewProps) {
-  const sourceRooms = propRooms && propRooms.length > 0 ? propRooms : INITIAL_ROOMS;
+  const {
+    rooms: contextRooms,
+    depositOverrides: overrides,
+    saveDepositOverride,
+    refreshWorkspace,
+  } = useAppData();
 
-  const [overrides, setOverrides] = useState<Record<string, RoomDepositOverride>>({});
+  const sourceRooms = propRooms ?? contextRooms;
+
   const [filter, setFilter] = useState<DepositFilter>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoomNumber, setSelectedRoomNumber] = useState<string | null>(null);
@@ -104,12 +97,14 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
   const [modalError, setModalError] = useState<string | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
 
   const roomDeposits: ResolvedRoomDeposit[] = [...sourceRooms]
     .sort(sortRoomNumbers)
@@ -139,7 +134,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
       const isOccupied = room.status !== 'Vacant';
       const defaultNumeric = isOccupied ? parseRupeeAmount(room.depositAmount) : 0;
       const defaultAmount = isOccupied ? formatRupeeAmount(defaultNumeric) : '₹0';
-      const defaultDate = isOccupied ? room.joinedDate || 'Jan 15, 2026' : '—';
+      const defaultDate = isOccupied ? room.joinedDate || formatShortDate() : '—';
       const defaultMode: DepositPaymentMode = 'Bank Transfer';
 
       return {
@@ -225,6 +220,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
     const formatted = formatRupeeAmount(cleanNum);
     const cleanNote = noteInput.trim();
     const roomKey = selectedDeposit.room.roomNumber;
+    const todayFormatted = formatShortDate();
 
     if (actionModalMode === 'deduct') {
       if (cleanNum > selectedDeposit.numericAmount) {
@@ -247,25 +243,26 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
         id: getNextDepositHistoryId(),
         title: 'Deposit Deduction',
         amount: `- ${formatted}`,
-        date: 'Today',
+        date: todayFormatted,
         mode: 'Deduction',
         note: cleanNote,
       };
 
-      setOverrides((prev) => ({
-        ...prev,
-        [roomKey]: {
-          amount: remainingFormatted,
-          numericAmount: remainingNumeric,
-          deductedAmount: nextDeductedFormatted,
-          numericDeducted: nextDeductedNumeric,
-          dateReceived: selectedDeposit.dateReceived,
-          dateRefunded: selectedDeposit.dateRefunded,
-          paymentMode: selectedDeposit.paymentMode,
-          status: remainingNumeric > 0 ? 'Held' : 'No Deposit',
-          history: [entry, ...selectedDeposit.history],
-        },
-      }));
+      const nextOverride: RoomDepositOverride = {
+        roomId: selectedDeposit.room.id,
+        roomNumber: roomKey,
+        amount: remainingFormatted,
+        numericAmount: remainingNumeric,
+        deductedAmount: nextDeductedFormatted,
+        numericDeducted: nextDeductedNumeric,
+        dateReceived: selectedDeposit.dateReceived,
+        dateRefunded: selectedDeposit.dateRefunded,
+        paymentMode: selectedDeposit.paymentMode,
+        status: remainingNumeric > 0 ? 'Held' : 'No Deposit',
+        history: [entry, ...selectedDeposit.history],
+      };
+
+      void saveDepositOverride(roomKey, nextOverride);
       setNoticeText(
         `Deducted ${formatted} from ${roomKey} (${cleanNote}). Remaining deposit: ${remainingFormatted}.`
       );
@@ -278,48 +275,48 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
         id: getNextDepositHistoryId(),
         title: 'Security Deposit Refunded',
         amount: formatted,
-        date: 'Today',
+        date: todayFormatted,
         mode: modalMode,
         note: cleanNote || undefined,
       };
-      setOverrides((prev) => ({
-        ...prev,
-        [roomKey]: {
-          amount: formatted,
-          numericAmount: cleanNum,
-          deductedAmount: selectedDeposit.deductedAmount,
-          numericDeducted: selectedDeposit.numericDeducted,
-          dateReceived: selectedDeposit.dateReceived,
-          dateRefunded: 'Today',
-          paymentMode: modalMode,
-          status: 'Refunded',
-          history: [entry, ...selectedDeposit.history],
-        },
-      }));
+      const nextOverride: RoomDepositOverride = {
+        roomId: selectedDeposit.room.id,
+        roomNumber: roomKey,
+        amount: formatted,
+        numericAmount: cleanNum,
+        deductedAmount: selectedDeposit.deductedAmount,
+        numericDeducted: selectedDeposit.numericDeducted,
+        dateReceived: selectedDeposit.dateReceived,
+        dateRefunded: todayFormatted,
+        paymentMode: modalMode,
+        status: 'Refunded',
+        history: [entry, ...selectedDeposit.history],
+      };
+      void saveDepositOverride(roomKey, nextOverride);
       setNoticeText(`Deposit for ${roomKey} marked as Refunded (${formatted}).`);
     } else {
       const entry: DepositHistoryEntry = {
         id: getNextDepositHistoryId(),
         title: 'Security Deposit Collected',
         amount: formatted,
-        date: 'Today',
+        date: todayFormatted,
         mode: modalMode,
         note: cleanNote || undefined,
       };
-      setOverrides((prev) => ({
-        ...prev,
-        [roomKey]: {
-          amount: formatted,
-          numericAmount: cleanNum,
-          deductedAmount: '₹0',
-          numericDeducted: 0,
-          dateReceived: 'Today',
-          dateRefunded: undefined,
-          paymentMode: modalMode,
-          status: 'Held',
-          history: [entry, ...selectedDeposit.history],
-        },
-      }));
+      const nextOverride: RoomDepositOverride = {
+        roomId: selectedDeposit.room.id,
+        roomNumber: roomKey,
+        amount: formatted,
+        numericAmount: cleanNum,
+        deductedAmount: '₹0',
+        numericDeducted: 0,
+        dateReceived: todayFormatted,
+        dateRefunded: undefined,
+        paymentMode: modalMode,
+        status: 'Held',
+        history: [entry, ...selectedDeposit.history],
+      };
+      void saveDepositOverride(roomKey, nextOverride);
       setNoticeText(`Deposit of ${formatted} recorded for ${roomKey}.`);
     }
 
@@ -565,6 +562,8 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
         <ScrollView
           style={{ flex: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={styles.container}
         >
           <View style={styles.contentWrapper}>
@@ -723,6 +722,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -901,15 +901,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,

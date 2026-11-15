@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
-  Alert,
   Modal,
   TextInput,
   TouchableWithoutFeedback,
@@ -15,199 +14,309 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
+import { useAppData } from '../../context/AppDataContext';
+import type { TransactionItem } from '../../types/appData';
+import { formatRupeeAmount, MONTHS_FULL, parseRupeeAmount } from '../../utils/finance';
+import PeriodicDetailsModal from '../../components/PeriodicDetailsModal';
 
 interface MoneyViewProps {
   onBack?: () => void;
 }
 
 export default function MoneyView({ onBack }: MoneyViewProps) {
+  const { transactions, addTransaction, removeTransaction, refreshWorkspace } = useAppData();
+
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
+
+  const [scope, setScope] = useState<'This Month' | 'All'>('This Month');
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [confirmDeleteTx, setConfirmDeleteTx] = useState<TransactionItem | null>(null);
+  const [isPeriodicModalOpen, setIsPeriodicModalOpen] = useState(false);
 
   const [isAddIncomeVisible, setIsAddIncomeVisible] = useState(false);
   const [incomeAmount, setIncomeAmount] = useState('');
   const [incomeCategory, setIncomeCategory] = useState('');
   const [incomeDescription, setIncomeDescription] = useState('');
 
-  const [incomeList, setIncomeList] = useState([
-    { id: '1', title: 'Room rent', subtitle: '9 rooms', amount: '₹85,000' },
-    { id: '2', title: 'Other income', subtitle: 'Parking, laundry', amount: '₹7,000' },
-  ]);
-
   const [isAddExpenseVisible, setIsAddExpenseVisible] = useState(false);
   const [expenseTitle, setExpenseTitle] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseSubtitle, setExpenseSubtitle] = useState('');
 
-  const [expensesList, setExpensesList] = useState([
-    { id: '1', title: 'Maintenance', subtitle: 'Repairs, cleaning', amount: '₹12,000' },
-    { id: '2', title: 'Utilities', subtitle: 'Water, power, internet', amount: '₹8,000' },
-    { id: '3', title: 'Staff & other', subtitle: 'Security, supplies', amount: '₹6,000' },
-  ]);
+  const now = new Date();
+  const currMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currMonthLabel = MONTHS_FULL[now.getMonth()];
 
-  const totalIncome = incomeList.reduce((acc, item) => {
-    const numeric = parseInt(item.amount.replace(/[^0-9]/g, ''), 10) || 0;
-    return acc + numeric;
-  }, 0);
+  const visibleTransactions =
+    scope === 'This Month'
+      ? transactions.filter((tx) => tx.dateIso.startsWith(currMonthPrefix))
+      : transactions;
 
-  const totalExpenses = expensesList.reduce((acc, item) => {
-    const numeric = parseInt(item.amount.replace(/[^0-9]/g, ''), 10) || 0;
-    return acc + numeric;
-  }, 0);
+  const incomeList = visibleTransactions.filter((tx) => tx.kind === 'income');
+  const expensesList = visibleTransactions.filter((tx) => tx.kind === 'expense');
 
-  const handleSaveIncome = () => {
-    if (!incomeAmount.trim() || !incomeCategory.trim()) {
-      Alert.alert('Required Fields', 'Please enter an income amount and category.');
+  const totalIncome = incomeList.reduce((acc, item) => acc + item.numericAmount, 0);
+  const totalExpenses = expensesList.reduce((acc, item) => acc + item.numericAmount, 0);
+
+  const handleSaveIncome = async () => {
+    const num = parseRupeeAmount(incomeAmount);
+    if (num <= 0 || !incomeCategory.trim()) {
+      setModalError('Please enter a valid income amount and category.');
       return;
     }
-    const cleanNum = incomeAmount.replace(/[^0-9]/g, '');
-    const formattedAmount = cleanNum
-      ? `₹${Number(cleanNum).toLocaleString('en-IN')}`
-      : incomeAmount.startsWith('₹') ? incomeAmount : `₹${incomeAmount}`;
-    const newInc = {
-      id: Date.now().toString(),
-      title: incomeCategory.trim(),
-      subtitle: incomeDescription.trim() || 'Additional income',
-      amount: formattedAmount,
-    };
-    setIncomeList([newInc, ...incomeList]);
+
+    const title = incomeCategory.trim();
+    const subtitle = incomeDescription.trim() || 'Additional income';
+
+    setModalError(null);
     setIncomeAmount('');
     setIncomeCategory('');
     setIncomeDescription('');
     setIsAddIncomeVisible(false);
-    Alert.alert('Income Added', `${newInc.title} (${newInc.amount}) recorded successfully.`);
+
+    await addTransaction({
+      kind: 'income',
+      title,
+      subtitle,
+      numericAmount: num,
+    });
+    setStatusNotice(`${title} (${formatRupeeAmount(num)}) added to income.`);
   };
 
-  const handleSaveExpense = () => {
-    if (!expenseTitle.trim() || !expenseAmount.trim()) {
-      Alert.alert('Required Fields', 'Please enter an expense category and amount.');
+  const handleSaveExpense = async () => {
+    const num = parseRupeeAmount(expenseAmount);
+    if (!expenseTitle.trim() || num <= 0) {
+      setModalError('Please enter an expense title and valid amount.');
       return;
     }
-    const formattedAmount = expenseAmount.startsWith('₹') ? expenseAmount : `₹${expenseAmount}`;
-    const newExp = {
-      id: Date.now().toString(),
-      title: expenseTitle.trim(),
-      subtitle: expenseSubtitle.trim() || 'General property expense',
-      amount: formattedAmount,
-    };
-    setExpensesList([newExp, ...expensesList]);
+
+    const title = expenseTitle.trim();
+    const subtitle = expenseSubtitle.trim() || 'General property expense';
+
+    setModalError(null);
     setExpenseTitle('');
     setExpenseAmount('');
     setExpenseSubtitle('');
     setIsAddExpenseVisible(false);
-    Alert.alert('Expense Added', `${newExp.title} (${newExp.amount}) recorded successfully.`);
+
+    await addTransaction({
+      kind: 'expense',
+      title,
+      subtitle,
+      numericAmount: num,
+    });
+    setStatusNotice(`${title} (${formatRupeeAmount(num)}) recorded as expense.`);
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={Palette.accentText}
-          colors={[Palette.accentText]}
-        />
-      }
-    >
-      {/* Top Header with Back button and Title */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity
-          style={styles.backButtonCircle}
-          onPress={onBack}
-          activeOpacity={0.7}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Accounts</Text>
-      </View>
-
-      {/* 2 Top Summary Cards: Income and Expenses */}
-      <View style={styles.summaryRow}>
-        {/* Income Card */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Income</Text>
-          <Text style={styles.summaryValue}>{`₹${totalIncome.toLocaleString('en-IN')}`}</Text>
-          <Text style={styles.summarySub}>This month</Text>
-          <View style={styles.caramelIndicator} />
-        </View>
-
-        {/* Expenses Card */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Expenses</Text>
-          <Text style={[styles.summaryValue, { color: Palette.text }]}>{`₹${totalExpenses.toLocaleString('en-IN')}`}</Text>
-          <Text style={styles.summarySub}>This month</Text>
-          <View style={[styles.caramelIndicator, { backgroundColor: Palette.primary }]} />
-        </View>
-      </View>
-
-      {/* Section: Income with Add button */}
-      <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
-        <Text style={styles.sectionHeading}>Income</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          activeOpacity={0.8}
-          onPress={() => setIsAddIncomeVisible(true)}
-        >
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.cardContainer}>
-        {incomeList.map((inc, index) => {
-          const isLast = index === incomeList.length - 1;
-          return (
-            <View key={inc.id}>
-              <View style={styles.itemRow}>
-                <View style={styles.itemLeft}>
-                  <Text style={styles.itemTitle}>{inc.title}</Text>
-                  <Text style={styles.itemSubtitle}>{inc.subtitle}</Text>
-                </View>
-                <Text style={styles.itemAmount}>{inc.amount}</Text>
-              </View>
-              {!isLast && <View style={styles.divider} />}
+    <View style={{ flex: 1 }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Palette.accentText}
+            colors={[Palette.accentText]}
+          />
+        }
+      >
+        <View style={styles.contentWrapper}>
+          {/* Top Header with Back button, Title, and Periodic Details button */}
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <TouchableOpacity
+                style={styles.backButtonCircle}
+                onPress={onBack}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Accounts</Text>
             </View>
-          );
-        })}
-      </View>
 
-      {/* Section: Expenses with Add button */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionHeading}>Expenses</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          activeOpacity={0.8}
-          onPress={() => setIsAddExpenseVisible(true)}
-        >
-          <Text style={styles.addButtonText}>Add</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.cardContainer}>
-        {expensesList.map((exp, index) => {
-          const isLast = index === expensesList.length - 1;
-          return (
-            <View key={exp.id}>
-              <View style={styles.itemRow}>
-                <View style={styles.itemLeft}>
-                  <Text style={styles.itemTitle}>{exp.title}</Text>
-                  <Text style={styles.itemSubtitle}>{exp.subtitle}</Text>
-                </View>
-                <Text style={styles.itemAmount}>{exp.amount}</Text>
-              </View>
-              {!isLast && <View style={styles.divider} />}
+            <View style={styles.headerRightActions}>
+              {/* Periodic Details Header Button - without icon, bit more down */}
+              <TouchableOpacity
+                style={styles.periodicDetailsBtn}
+                onPress={() => setIsPeriodicModalOpen(true)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Periodic Details"
+              >
+                <Text style={styles.periodicDetailsBtnText}>Periodic Details</Text>
+              </TouchableOpacity>
             </View>
-          );
-        })}
-      </View>
+          </View>
+
+          {/* Period Filter Pills */}
+          <View style={styles.scopePillRow}>
+            {(['This Month', 'All'] as const).map((tab) => {
+              const active = scope === tab;
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.scopeChip, active && styles.scopeChipActive]}
+                  onPress={() => setScope(tab)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.scopeChipText, active && styles.scopeChipTextActive]}>
+                    {tab}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {statusNotice ? (
+            <View style={styles.noticeBanner}>
+              <Text style={styles.noticeBannerText}>{statusNotice}</Text>
+              <TouchableOpacity onPress={() => setStatusNotice(null)}>
+                <Text style={styles.noticeDismissText}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          {/* 2 Top Summary Cards: Income and Expenses */}
+          <View style={styles.summaryRow}>
+            {/* Income Card */}
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Income</Text>
+              <Text style={styles.summaryValue}>{formatRupeeAmount(totalIncome)}</Text>
+              <Text style={styles.summarySub}>
+                {scope === 'This Month' ? currMonthLabel : 'All recorded'}
+              </Text>
+              <View style={styles.caramelIndicator} />
+            </View>
+
+            {/* Expenses Card */}
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryLabel}>Expenses</Text>
+              <Text style={[styles.summaryValue, { color: Palette.text }]}>
+                {formatRupeeAmount(totalExpenses)}
+              </Text>
+              <Text style={styles.summarySub}>
+                {scope === 'This Month' ? currMonthLabel : 'All recorded'}
+              </Text>
+              <View style={[styles.caramelIndicator, { backgroundColor: Palette.primary }]} />
+            </View>
+          </View>
+
+          {/* Section: Income with Add button */}
+          <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
+            <Text style={styles.sectionHeading}>Income ({incomeList.length})</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              activeOpacity={0.8}
+              onPress={() => {
+                setModalError(null);
+                setIsAddIncomeVisible(true);
+              }}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.cardContainer}>
+            {incomeList.length === 0 ? (
+              <View style={styles.emptyRow}>
+                <Text style={styles.emptyText}>No income entries for this period.</Text>
+              </View>
+            ) : (
+              incomeList.map((inc, index) => {
+                const isLast = index === incomeList.length - 1;
+                return (
+                  <View key={inc.id}>
+                    <View style={styles.itemRow}>
+                      <View style={styles.itemLeft}>
+                        <Text style={styles.itemTitle}>{inc.title}</Text>
+                        <Text style={styles.itemSubtitle}>
+                          {inc.subtitle} · {inc.date}
+                        </Text>
+                      </View>
+                      <View style={styles.itemRight}>
+                        <Text style={styles.itemAmount}>{inc.amount}</Text>
+                        <TouchableOpacity
+                          onPress={() => setConfirmDeleteTx(inc)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={styles.deleteBtn}
+                        >
+                          <Feather name="trash-2" size={14} color={Palette.textMuted} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    {!isLast && <View style={styles.divider} />}
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          {/* Section: Expenses with Add button */}
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionHeading}>Expenses ({expensesList.length})</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              activeOpacity={0.8}
+              onPress={() => {
+                setModalError(null);
+                setIsAddExpenseVisible(true);
+              }}
+            >
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.cardContainer}>
+            {expensesList.length === 0 ? (
+              <View style={styles.emptyRow}>
+                <Text style={styles.emptyText}>No expense entries for this period.</Text>
+              </View>
+            ) : (
+              expensesList.map((exp, index) => {
+                const isLast = index === expensesList.length - 1;
+                return (
+                  <View key={exp.id}>
+                    <View style={styles.itemRow}>
+                      <View style={styles.itemLeft}>
+                        <Text style={styles.itemTitle}>{exp.title}</Text>
+                        <Text style={styles.itemSubtitle}>
+                          {exp.subtitle} · {exp.date}
+                        </Text>
+                      </View>
+                      <View style={styles.itemRight}>
+                        <Text style={styles.itemAmount}>{exp.amount}</Text>
+                        <TouchableOpacity
+                          onPress={() => setConfirmDeleteTx(exp)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={styles.deleteBtn}
+                        >
+                          <Feather name="trash-2" size={14} color={Palette.textMuted} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    {!isLast && <View style={styles.divider} />}
+                  </View>
+                );
+              })
+            )}
+          </View>
+        </View>
+      </ScrollView>
 
       {/* Add Expense Modal */}
       <Modal
@@ -233,13 +342,22 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {modalError ? (
+                <View style={styles.modalErrorBanner}>
+                  <Text style={styles.modalErrorText}>{modalError}</Text>
+                </View>
+              ) : null}
+
               <Text style={styles.inputLabel}>Expense Title / Category</Text>
               <TextInput
                 style={styles.inputField}
                 placeholder="e.g. Electrical maintenance"
                 placeholderTextColor={Palette.textMuted}
                 value={expenseTitle}
-                onChangeText={setExpenseTitle}
+                onChangeText={(txt) => {
+                  setExpenseTitle(txt);
+                  if (modalError) setModalError(null);
+                }}
               />
 
               <Text style={styles.inputLabel}>Amount (₹)</Text>
@@ -249,7 +367,10 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
                 placeholderTextColor={Palette.textMuted}
                 keyboardType="numeric"
                 value={expenseAmount}
-                onChangeText={setExpenseAmount}
+                onChangeText={(txt) => {
+                  setExpenseAmount(txt);
+                  if (modalError) setModalError(null);
+                }}
               />
 
               <Text style={styles.inputLabel}>Description / Notes</Text>
@@ -297,6 +418,12 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {modalError ? (
+                <View style={styles.modalErrorBanner}>
+                  <Text style={styles.modalErrorText}>{modalError}</Text>
+                </View>
+              ) : null}
+
               <Text style={styles.inputLabel}>Amount (₹)</Text>
               <TextInput
                 style={styles.inputField}
@@ -304,7 +431,10 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
                 placeholderTextColor={Palette.textMuted}
                 keyboardType="numeric"
                 value={incomeAmount}
-                onChangeText={setIncomeAmount}
+                onChangeText={(txt) => {
+                  setIncomeAmount(txt);
+                  if (modalError) setModalError(null);
+                }}
               />
 
               <Text style={styles.inputLabel}>Category</Text>
@@ -313,7 +443,10 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
                 placeholder="e.g. Parking, Deposit, Maintenance"
                 placeholderTextColor={Palette.textMuted}
                 value={incomeCategory}
-                onChangeText={setIncomeCategory}
+                onChangeText={(txt) => {
+                  setIncomeCategory(txt);
+                  if (modalError) setModalError(null);
+                }}
               />
 
               <Text style={styles.inputLabel}>Description</Text>
@@ -336,7 +469,53 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={confirmDeleteTx !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmDeleteTx(null)}
+      >
+        <View style={styles.confirmOverlay}>
+          <TouchableWithoutFeedback onPress={() => setConfirmDeleteTx(null)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Delete Entry</Text>
+            <Text style={styles.confirmMessage}>
+              Remove {confirmDeleteTx?.title} ({confirmDeleteTx?.amount}) from accounts?
+            </Text>
+            <View style={styles.confirmRow}>
+              <TouchableOpacity
+                style={styles.confirmCancelBtn}
+                onPress={() => setConfirmDeleteTx(null)}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmDeleteBtn}
+                onPress={() => {
+                  if (confirmDeleteTx) {
+                    const label = `${confirmDeleteTx.title} (${confirmDeleteTx.amount})`;
+                    void removeTransaction(confirmDeleteTx.id);
+                    setStatusNotice(`Removed ${label}.`);
+                  }
+                  setConfirmDeleteTx(null);
+                }}
+              >
+                <Text style={styles.confirmDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      {/* Rental Periodic Details Modal */}
+      <PeriodicDetailsModal
+        visible={isPeriodicModalOpen}
+        onClose={() => setIsPeriodicModalOpen(false)}
+      />
+    </View>
   );
 }
 
@@ -347,21 +526,43 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     backgroundColor: Palette.background,
   },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
+  },
   headerRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 22,
+  },
+  periodicDetailsBtn: {
+    backgroundColor: Palette.primary,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 5,
+    marginTop: 14,
+  },
+  periodicDetailsBtnText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Palette.onPrimary,
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
@@ -373,6 +574,55 @@ const styles = StyleSheet.create({
       android: { fontFamily: 'serif' },
       default: { fontFamily: 'serif' },
     }),
+  },
+  scopePillRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  scopeChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: Radius.pill,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  scopeChipActive: {
+    backgroundColor: Palette.primary,
+    borderColor: Palette.primary,
+  },
+  scopeChipText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '600',
+    color: Palette.textSecondary,
+  },
+  scopeChipTextActive: {
+    color: Palette.onPrimary,
+  },
+  noticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Palette.tint,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+    gap: 10,
+  },
+  noticeBannerText: {
+    flex: 1,
+    fontSize: Typography.fontSize.caption,
+    color: Palette.text,
+    fontWeight: '600',
+  },
+  noticeDismissText: {
+    fontSize: Typography.fontSize.caption,
+    color: Palette.primary,
+    fontWeight: '700',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -415,7 +665,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     color: Palette.text,
-    marginBottom: 12,
     letterSpacing: -0.2,
   },
   sectionHeaderRow: {
@@ -444,14 +693,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.border,
   },
+  emptyRow: {
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.textSecondary,
+  },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 14,
+    gap: 10,
   },
   itemLeft: {
     flex: 1,
+  },
+  itemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  deleteBtn: {
+    padding: 4,
   },
   itemTitle: {
     fontSize: Typography.fontSize.base,
@@ -505,6 +771,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Palette.text,
   },
+  modalErrorBanner: {
+    backgroundColor: Palette.status.overdue.bg,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  modalErrorText: {
+    color: Palette.status.overdue.text,
+    fontSize: Typography.fontSize.caption,
+    fontWeight: '600',
+  },
   inputLabel: {
     fontSize: Typography.fontSize.sm,
     fontWeight: '600',
@@ -533,5 +811,61 @@ const styles = StyleSheet.create({
     color: Palette.onPrimary,
     fontSize: Typography.fontSize.md,
     fontWeight: '700',
+  },
+  confirmOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 22,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
+    backgroundColor: Palette.surface,
+    borderRadius: Radius.md,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Palette.border,
+  },
+  confirmTitle: {
+    fontSize: Typography.fontSize.md,
+    fontWeight: '700',
+    color: Palette.text,
+    marginBottom: 8,
+  },
+  confirmMessage: {
+    fontSize: Typography.fontSize.base,
+    color: Palette.textSecondary,
+    marginBottom: 18,
+    lineHeight: 20,
+  },
+  confirmRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: Radius.sm,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  confirmCancelText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '600',
+    color: Palette.text,
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    backgroundColor: Palette.status.overdue.text,
+    borderRadius: Radius.sm,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  confirmDeleteText: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+    color: Palette.onPrimary,
   },
 });

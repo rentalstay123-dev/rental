@@ -9,6 +9,8 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
+import { useAppData } from '../../context/AppDataContext';
+import { formatRupeeAmount } from '../../utils/finance';
 import type { RentFilter } from './RentView';
 
 interface DashboardViewProps {
@@ -19,90 +21,44 @@ interface DashboardViewProps {
   ) => void;
 }
 
-interface PendingRentItem {
-  id: string;
-  roomNumber: string;
-  badgeLabel: string;
-  badgeType: 'overdue' | 'due';
-  subtitle: string;
-  amount: string;
-  statusNote: string;
-}
-
-const PENDING_RENTS: PendingRentItem[] = [
-  {
-    id: 'rent-102',
-    roomNumber: 'Room 102',
-    badgeLabel: 'Overdue',
-    badgeType: 'overdue',
-    subtitle: 'Priya Sharma · Due Oct 15',
-    amount: '₹15,000',
-    statusNote: 'Pending',
-  },
-  {
-    id: 'rent-201',
-    roomNumber: 'Room 201',
-    badgeLabel: 'Due',
-    badgeType: 'due',
-    subtitle: 'Arjun Kumar · Due Nov 1',
-    amount: '₹10,000',
-    statusNote: 'Upcoming',
-  },
-];
-
-interface CustomerMessage {
-  id: string;
-  senderName: string;
-  roomNumber: string;
-  phone: string;
-  time: string;
-  message: string;
-  tag: string;
-}
-
-const CUSTOMER_MESSAGES: CustomerMessage[] = [
-  {
-    id: 'msg-1',
-    senderName: 'Sana Khan',
-    roomNumber: 'Room 104',
-    phone: '+91 97400 99881',
-    time: '10m ago',
-    message: 'Water tap in bathroom is leaking continuously, please send plumber.',
-    tag: 'Plumbing',
-  },
-  {
-    id: 'msg-2',
-    senderName: 'Sneha Patel',
-    roomNumber: 'Room 202',
-    phone: '+91 94480 33445',
-    time: '2h ago',
-    message: 'Main bedroom fan regulator is not rotating properly, needs replacement.',
-    tag: 'Electrical',
-  },
-  {
-    id: 'msg-3',
-    senderName: 'Anil Rao',
-    roomNumber: 'Room 101',
-    phone: '+91 98450 11223',
-    time: 'Today, 11:30 AM',
-    message: 'Transferred October rent of ₹9,000 via UPI (Ref: 430198). Please confirm receipt.',
-    tag: 'Payment',
-  },
-];
-
 export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
+  const {
+    profile,
+    rentList,
+    notifications,
+    dashboardMetrics,
+    refreshWorkspace,
+  } = useAppData();
+
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
+
+  const pendingRents = rentList.filter(
+    (item) => item.currentStatus === 'Due' || item.currentStatus === 'Overdue'
+  );
+  const customerMessages = notifications.filter((n) => n.type === 'customer');
+
+  const firstName = profile.fullName.trim().split(/\s+/)[0];
+  const growthLabel =
+    dashboardMetrics.growthPct !== null
+      ? `${dashboardMetrics.growthPct >= 0 ? '+' : ''}${dashboardMetrics.growthPct}% mo`
+      : 'This month';
+  const isNegativeGrowth =
+    dashboardMetrics.growthPct !== null && dashboardMetrics.growthPct < 0;
 
   return (
     <ScrollView
       style={styles.scrollView}
       showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
       contentContainerStyle={styles.scrollContent}
       refreshControl={
         <RefreshControl
@@ -115,34 +71,52 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
     >
       <View style={styles.contentWrapper}>
         {/* Welcome back */}
-        <Text style={styles.welcomeTitle}>Welcome back</Text>
+        <Text style={styles.welcomeTitle}>
+          {firstName ? `Welcome, ${firstName}` : 'Welcome'}
+        </Text>
 
-        {/* Hero Card: Net profit · October (White summary card with Coffee Brown highlight & Profit Margin bar) */}
+        {/* Hero Card: Net profit */}
         <TouchableOpacity
           style={styles.profitCard}
           activeOpacity={0.85}
           onPress={() => onNavigatePage && onNavigatePage('Accounts')}
           accessibilityRole="button"
-          accessibilityLabel="Net profit October ₹66,000, view accounts"
+          accessibilityLabel={`Net profit ${dashboardMetrics.monthLabel} ${formatRupeeAmount(
+            dashboardMetrics.netProfit
+          )}, view accounts`}
         >
           <View style={styles.profitHeaderRow}>
-            <Text style={styles.profitHeader}>Net profit · October</Text>
+            <Text style={styles.profitHeader}>Net profit · {dashboardMetrics.monthLabel}</Text>
             <View style={styles.profitBadge}>
-              <Text style={styles.profitBadgeText}>+12% mo</Text>
+              <Text
+                style={[
+                  styles.profitBadgeText,
+                  isNegativeGrowth && { color: Palette.status.overdue.text },
+                ]}
+              >
+                {growthLabel}
+              </Text>
             </View>
           </View>
-          <Text style={styles.profitAmount}>₹66,000</Text>
-          <Text style={styles.profitBreakdown}>Income ₹92,000  ·  Expenses ₹26,000</Text>
+          <Text style={styles.profitAmount}>
+            {formatRupeeAmount(dashboardMetrics.netProfit)}
+          </Text>
+          <Text style={styles.profitBreakdown}>
+            Income {formatRupeeAmount(dashboardMetrics.totalIncome)}  ·  Expenses{' '}
+            {formatRupeeAmount(dashboardMetrics.totalExpenses)}
+          </Text>
           <View
             style={styles.profitTrack}
             accessible
             accessibilityRole="progressbar"
-            accessibilityLabel="Net profit margin: 72% of total income"
-            accessibilityValue={{ min: 0, max: 100, now: 72 }}
+            accessibilityLabel={`Net profit margin: ${dashboardMetrics.marginPct}% of total income`}
+            accessibilityValue={{ min: 0, max: 100, now: dashboardMetrics.marginPct }}
           >
-            <View style={styles.profitFill} />
+            <View style={[styles.profitFill, { width: `${dashboardMetrics.marginPct}%` }]} />
           </View>
-          <Text style={styles.profitScaleText}>72% net margin of total income</Text>
+          <Text style={styles.profitScaleText}>
+            {dashboardMetrics.marginPct}% net margin of total income
+          </Text>
         </TouchableOpacity>
 
         {/* 2-Column Metric Cards */}
@@ -153,11 +127,13 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
             activeOpacity={0.85}
             onPress={() => onNavigatePage && onNavigatePage('Rooms')}
             accessibilityRole="button"
-            accessibilityLabel="Rooms occupied 9 of 12, 3 vacant, view rooms"
+            accessibilityLabel={`Rooms occupied ${dashboardMetrics.occupiedRooms} of ${dashboardMetrics.totalRooms}, ${dashboardMetrics.vacantRooms} vacant, view rooms`}
           >
             <Text style={styles.metricLabel}>Rooms occupied</Text>
-            <Text style={styles.metricValue}>9 / 12</Text>
-            <Text style={styles.metricSubtext}>3 vacant</Text>
+            <Text style={styles.metricValue}>
+              {dashboardMetrics.occupiedRooms} / {dashboardMetrics.totalRooms}
+            </Text>
+            <Text style={styles.metricSubtext}>{dashboardMetrics.vacantRooms} vacant</Text>
           </TouchableOpacity>
 
           {/* Rent pending */}
@@ -166,15 +142,22 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
             activeOpacity={0.85}
             onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
             accessibilityRole="button"
-            accessibilityLabel="Rent pending ₹25,000, 2 rooms due, view rent"
+            accessibilityLabel={`Rent pending ${formatRupeeAmount(
+              dashboardMetrics.pendingRentTotal
+            )}, ${dashboardMetrics.pendingRoomsCount} rooms due, view rent`}
           >
             <Text style={styles.metricLabel}>Rent pending</Text>
-            <Text style={[styles.metricValue, { color: Palette.primary }]}>₹25,000</Text>
-            <Text style={styles.metricSubtext}>2 rooms due</Text>
+            <Text style={[styles.metricValue, { color: Palette.primary }]}>
+              {formatRupeeAmount(dashboardMetrics.pendingRentTotal)}
+            </Text>
+            <Text style={styles.metricSubtext}>
+              {dashboardMetrics.pendingRoomsCount}{' '}
+              {dashboardMetrics.pendingRoomsCount === 1 ? 'room' : 'rooms'} due
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Section: Rent Due*/}
+        {/* Section: Rent Due */}
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Rent Due</Text>
           <TouchableOpacity
@@ -195,84 +178,116 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
         </View>
 
         <View style={styles.cardContainer}>
-          {PENDING_RENTS.map((item, index) => {
-            const isLast = index === PENDING_RENTS.length - 1;
-            const isOverdue = item.badgeType === 'overdue';
-            return (
-              <React.Fragment key={item.id}>
-                <TouchableOpacity
-                  style={styles.pendingItemRow}
-                  activeOpacity={0.7}
-                  onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.roomNumber}, ${item.subtitle}, ${item.badgeLabel}, ${item.amount} ${item.statusNote}`}
-                >
-                  <View style={styles.pendingLeftCol}>
-                    <View style={styles.roomBadgeRow}>
-                      <Text style={styles.pendingRoomNumber}>{item.roomNumber}</Text>
-                      <View style={isOverdue ? styles.overdueBadge : styles.dueBadge}>
-                        <Text
-                          style={isOverdue ? styles.overdueBadgeText : styles.dueBadgeText}
-                        >
-                          {item.badgeLabel}
-                        </Text>
+          {pendingRents.length === 0 ? (
+            <View style={styles.emptyCardRow}>
+              <Text style={styles.emptyCardText}>All occupied rooms are paid up for now.</Text>
+            </View>
+          ) : (
+            pendingRents.map((item, index) => {
+              const isLast = index === pendingRents.length - 1;
+              const isOverdue = item.currentStatus === 'Overdue';
+              const badgeLabel = isOverdue ? 'Overdue' : 'Due';
+              const statusNote = isOverdue ? 'Pending' : 'Upcoming';
+              return (
+                <React.Fragment key={item.id}>
+                  <TouchableOpacity
+                    style={styles.pendingItemRow}
+                    activeOpacity={0.7}
+                    onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.roomNumber}, ${item.tenantName}, ${badgeLabel}, ${item.monthlyRent} ${statusNote}`}
+                  >
+                    <View style={styles.pendingLeftCol}>
+                      <View style={styles.roomBadgeRow}>
+                        <Text style={styles.pendingRoomNumber}>{item.roomNumber}</Text>
+                        <View style={isOverdue ? styles.overdueBadge : styles.dueBadge}>
+                          <Text
+                            style={isOverdue ? styles.overdueBadgeText : styles.dueBadgeText}
+                          >
+                            {badgeLabel}
+                          </Text>
+                        </View>
                       </View>
+                      <Text style={styles.pendingTenantText}>
+                        {item.tenantName} · Due {item.dueDate}
+                      </Text>
                     </View>
-                    <Text style={styles.pendingTenantText}>{item.subtitle}</Text>
-                  </View>
-                  <View style={styles.rowRightAction}>
-                    <View style={styles.pendingRightCol}>
-                      <Text style={styles.pendingAmount}>{item.amount}</Text>
-                      <Text style={styles.pendingSubInfo}>{item.statusNote}</Text>
+                    <View style={styles.rowRightAction}>
+                      <View style={styles.pendingRightCol}>
+                        <Text style={styles.pendingAmount}>{item.monthlyRent}</Text>
+                        <Text style={styles.pendingSubInfo}>{statusNote}</Text>
+                      </View>
+                      <Feather
+                        name="chevron-right"
+                        size={Typography.iconSize.sm}
+                        color={Palette.primary}
+                      />
                     </View>
-                    <Feather
-                      name="chevron-right"
-                      size={Typography.iconSize.sm}
-                      color={Palette.primary}
-                    />
-                  </View>
-                </TouchableOpacity>
-                {!isLast && <View style={styles.divider} />}
-              </React.Fragment>
-            );
-          })}
+                  </TouchableOpacity>
+                  {!isLast && <View style={styles.divider} />}
+                </React.Fragment>
+              );
+            })
+          )}
         </View>
 
         {/* Section: Service Requests */}
         <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
           <Text style={styles.sectionTitle}>Service Requests</Text>
-          <Text style={styles.messageCountText}>{CUSTOMER_MESSAGES.length} new</Text>
+          <View style={styles.sectionActionRow}>
+            <TouchableOpacity
+              style={styles.headerRequestButton}
+              activeOpacity={0.7}
+              onPress={() => onNavigatePage && onNavigatePage('Notifications')}
+              accessibilityRole="button"
+              accessibilityLabel="Request"
+            >
+              <Text style={styles.headerRequestButtonText}>Request</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.cardContainer}>
-          {CUSTOMER_MESSAGES.map((msg, index) => {
-            const isLast = index === CUSTOMER_MESSAGES.length - 1;
-            return (
-              <React.Fragment key={msg.id}>
-                <TouchableOpacity
-                  style={styles.messageItem}
-                  activeOpacity={0.7}
-                  onPress={() => onNavigatePage && onNavigatePage('Notifications', msg.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${msg.senderName}, ${msg.roomNumber}, ${msg.tag}, open message`}
-                >
-                  <Text style={styles.messageSenderTitle}>
-                    {msg.senderName} · {msg.roomNumber}
-                  </Text>
+          {customerMessages.length === 0 ? (
+            <TouchableOpacity
+              style={styles.emptyCardRow}
+              activeOpacity={0.7}
+              onPress={() => onNavigatePage && onNavigatePage('Notifications')}
+            >
+              <Text style={styles.emptyCardText}>
+                No active service requests. Tap to open Notifications.
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            customerMessages.slice(0, 5).map((msg, index) => {
+              const isLast = index === Math.min(customerMessages.length, 5) - 1;
+              return (
+                <React.Fragment key={msg.id}>
+                  <TouchableOpacity
+                    style={styles.messageItem}
+                    activeOpacity={0.7}
+                    onPress={() => onNavigatePage && onNavigatePage('Notifications', msg.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${msg.senderName || 'Resident'}, ${msg.roomNumber || ''}, ${msg.tag}, open message`}
+                  >
+                    <Text style={styles.messageSenderTitle} numberOfLines={1}>
+                      {msg.senderName ? `${msg.senderName} · ${msg.roomNumber || ''}` : msg.title}
+                    </Text>
 
-                  <View style={styles.messageRightRow}>
-                    <Text style={styles.singleWordTag}>{msg.tag}</Text>
-                    <Feather
-                      name="chevron-right"
-                      size={Typography.iconSize.sm}
-                      color={Palette.primary}
-                    />
-                  </View>
-                </TouchableOpacity>
-                {!isLast && <View style={styles.divider} />}
-              </React.Fragment>
-            );
-          })}
+                    <View style={styles.messageRightRow}>
+                      <Text style={styles.singleWordTag}>{msg.tag}</Text>
+                      <Feather
+                        name="chevron-right"
+                        size={Typography.iconSize.sm}
+                        color={Palette.primary}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  {!isLast && <View style={styles.divider} />}
+                </React.Fragment>
+              );
+            })
+          )}
         </View>
       </View>
     </ScrollView>
@@ -350,7 +365,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   profitFill: {
-    width: '72%',
     height: '100%',
     backgroundColor: Palette.primary,
     borderRadius: Radius.xs,
@@ -422,6 +436,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.border,
   },
+  emptyCardRow: {
+    paddingVertical: 18,
+    alignItems: 'center',
+  },
+  emptyCardText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.textSecondary,
+  },
   pendingItemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -466,10 +488,23 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     fontWeight: '500',
   },
-  messageCountText: {
+  sectionActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerRequestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+  },
+  headerRequestButtonText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-    color: Palette.primary,
+    color: Palette.onPrimary,
   },
   messageItem: {
     flexDirection: 'row',
@@ -507,14 +542,6 @@ const styles = StyleSheet.create({
   },
   dueBadgeText: {
     color: Palette.status.due.text,
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
-  },
-  openBadge: {
-    paddingVertical: 1,
-  },
-  openBadgeText: {
-    color: Palette.status.pending.text,
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },

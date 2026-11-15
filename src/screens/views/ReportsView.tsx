@@ -13,7 +13,9 @@ import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { Palette, Radius, Typography } from '../../constants/theme';
-import { INITIAL_ROOMS, RoomItem } from './RoomsView';
+import { useAppData } from '../../context/AppDataContext';
+import type { RoomItem } from '../../types/appData';
+import { buildDynamicReports } from '../../utils/finance';
 import {
   buildOccupancyStats,
   buildRentalIncomeHtmlReport,
@@ -48,248 +50,6 @@ interface WebDownloadEnv {
   };
 }
 
-const REPORT_TODAY_DATE = '10 Nov 2026';
-
-const WEEKLY_REPORTS: ReportPeriodData[] = [
-  {
-    id: 'oct-w3-2026',
-    label: 'Oct 14–20',
-    fullTitle: 'Oct 14 – Oct 20, 2026',
-    shortLabel: 'Oct 14',
-    asOfDate: '20 Oct 2026',
-    netProfit: '₹12,500',
-    totalInflow: '₹18,000',
-    totalOutflow: '₹5,500',
-    profitMargin: '69.4%',
-    rentRevenue: '₹14,000',
-    maintenanceCollected: '₹4,000',
-    repairsExpense: '₹2,500',
-    utilitiesExpense: '₹1,500',
-    staffExpense: '₹1,500',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '2 Rooms Collected',
-    pendingText: '₹17,000',
-    chartIncomeK: 18,
-    chartExpenseK: 5.5,
-  },
-  {
-    id: 'oct-w4-2026',
-    label: 'Oct 21–27',
-    fullTitle: 'Oct 21 – Oct 27, 2026',
-    shortLabel: 'Oct 21',
-    asOfDate: '27 Oct 2026',
-    netProfit: '₹10,500',
-    totalInflow: '₹16,000',
-    totalOutflow: '₹5,500',
-    profitMargin: '65.6%',
-    rentRevenue: '₹13,000',
-    maintenanceCollected: '₹3,000',
-    repairsExpense: '₹3,000',
-    utilitiesExpense: '₹1,500',
-    staffExpense: '₹1,000',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '1 Room Collected',
-    pendingText: '₹7,000',
-    chartIncomeK: 16,
-    chartExpenseK: 5.5,
-  },
-  {
-    id: 'nov-w1-2026',
-    label: 'Oct 28–Nov 3',
-    fullTitle: 'Oct 28 – Nov 3, 2026',
-    shortLabel: 'Oct 28',
-    asOfDate: '03 Nov 2026',
-    netProfit: '₹31,000',
-    totalInflow: '₹36,000',
-    totalOutflow: '₹5,000',
-    profitMargin: '86.1%',
-    rentRevenue: '₹30,000',
-    maintenanceCollected: '₹6,000',
-    repairsExpense: '₹1,500',
-    utilitiesExpense: '₹2,000',
-    staffExpense: '₹1,500',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '4 Rooms Collected',
-    pendingText: '₹56,000',
-    chartIncomeK: 36,
-    chartExpenseK: 5,
-  },
-  {
-    id: 'nov-w2-till',
-    label: 'Nov 4–10',
-    fullTitle: 'Nov 4 – Nov 10, 2026',
-    shortLabel: 'Nov 4',
-    asOfDate: REPORT_TODAY_DATE,
-    netProfit: '₹24,500',
-    totalInflow: '₹31,000',
-    totalOutflow: '₹6,500',
-    profitMargin: '79.0%',
-    rentRevenue: '₹25,000',
-    maintenanceCollected: '₹6,000',
-    repairsExpense: '₹3,000',
-    utilitiesExpense: '₹2,000',
-    staffExpense: '₹1,500',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '3 Rooms Collected',
-    pendingText: '₹25,000',
-    chartIncomeK: 31,
-    chartExpenseK: 6.5,
-  },
-];
-
-const MONTHLY_REPORTS: ReportPeriodData[] = [
-  {
-    id: 'aug-2026',
-    label: 'August 2026',
-    fullTitle: 'August 2026',
-    shortLabel: 'Aug',
-    asOfDate: '31 Aug 2026',
-    netProfit: '₹61,000',
-    totalInflow: '₹85,000',
-    totalOutflow: '₹24,000',
-    profitMargin: '71.8%',
-    rentRevenue: '₹71,000',
-    maintenanceCollected: '₹14,000',
-    repairsExpense: '₹10,000',
-    utilitiesExpense: '₹8,000',
-    staffExpense: '₹6,000',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '₹79,000 (92.9%)',
-    pendingText: '₹6,000',
-    chartIncomeK: 85,
-    chartExpenseK: 24,
-  },
-  {
-    id: 'sep-2026',
-    label: 'September 2026',
-    fullTitle: 'September 2026',
-    shortLabel: 'Sep',
-    asOfDate: '30 Sep 2026',
-    netProfit: '₹63,000',
-    totalInflow: '₹88,000',
-    totalOutflow: '₹25,000',
-    profitMargin: '71.6%',
-    rentRevenue: '₹72,000',
-    maintenanceCollected: '₹16,000',
-    repairsExpense: '₹11,000',
-    utilitiesExpense: '₹8,000',
-    staffExpense: '₹6,000',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '₹82,000 (93.2%)',
-    pendingText: '₹6,000',
-    chartIncomeK: 88,
-    chartExpenseK: 25,
-  },
-  {
-    id: 'oct-2026',
-    label: 'October 2026',
-    fullTitle: 'October 2026',
-    shortLabel: 'Oct',
-    asOfDate: '31 Oct 2026',
-    netProfit: '₹66,000',
-    totalInflow: '₹92,000',
-    totalOutflow: '₹26,000',
-    profitMargin: '71.7%',
-    rentRevenue: '₹74,000',
-    maintenanceCollected: '₹18,000',
-    repairsExpense: '₹11,500',
-    utilitiesExpense: '₹8,500',
-    staffExpense: '₹6,000',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '₹85,000 (92.4%)',
-    pendingText: '₹7,000',
-    chartIncomeK: 92,
-    chartExpenseK: 26,
-  },
-  {
-    id: 'nov-2026-till',
-    label: 'Nov 1–10',
-    fullTitle: 'Nov 1 – Nov 10, 2026',
-    shortLabel: 'Nov',
-    asOfDate: REPORT_TODAY_DATE,
-    netProfit: '₹55,500',
-    totalInflow: '₹67,000',
-    totalOutflow: '₹11,500',
-    profitMargin: '82.8%',
-    rentRevenue: '₹55,000',
-    maintenanceCollected: '₹12,000',
-    repairsExpense: '₹4,500',
-    utilitiesExpense: '₹4,000',
-    staffExpense: '₹3,000',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '₹67,000 (72.8%)',
-    pendingText: '₹25,000',
-    chartIncomeK: 67,
-    chartExpenseK: 11.5,
-  },
-];
-
-const YEARLY_REPORTS: ReportPeriodData[] = [
-  {
-    id: 'year-2024',
-    label: '2024',
-    fullTitle: 'Year 2024 (Jan – Dec)',
-    shortLabel: '2024',
-    asOfDate: '31 Dec 2024',
-    netProfit: '₹6,12,000',
-    totalInflow: '₹8,80,000',
-    totalOutflow: '₹2,68,000',
-    profitMargin: '69.5%',
-    rentRevenue: '₹7,12,000',
-    maintenanceCollected: '₹1,68,000',
-    repairsExpense: '₹1,14,000',
-    utilitiesExpense: '₹88,000',
-    staffExpense: '₹66,000',
-    occupancyText: '8 / 12 Avg (67%)',
-    collectionText: '₹8,56,000 (97.3%)',
-    pendingText: '₹0',
-    chartIncomeK: 880,
-    chartExpenseK: 268,
-  },
-  {
-    id: 'year-2025',
-    label: '2025',
-    fullTitle: 'Year 2025 (Jan – Dec)',
-    shortLabel: '2025',
-    asOfDate: '31 Dec 2025',
-    netProfit: '₹6,96,000',
-    totalInflow: '₹9,84,000',
-    totalOutflow: '₹2,88,000',
-    profitMargin: '70.7%',
-    rentRevenue: '₹7,92,000',
-    maintenanceCollected: '₹1,92,000',
-    repairsExpense: '₹1,22,000',
-    utilitiesExpense: '₹94,000',
-    staffExpense: '₹72,000',
-    occupancyText: '9 / 12 Avg (75%)',
-    collectionText: '₹9,72,000 (98.8%)',
-    pendingText: '₹0',
-    chartIncomeK: 984,
-    chartExpenseK: 288,
-  },
-  {
-    id: 'year-2026-till',
-    label: '2026',
-    fullTitle: 'Jan 1 – Nov 10, 2026',
-    shortLabel: '2026',
-    asOfDate: REPORT_TODAY_DATE,
-    netProfit: '₹6,77,500',
-    totalInflow: '₹9,42,000',
-    totalOutflow: '₹2,64,500',
-    profitMargin: '71.9%',
-    rentRevenue: '₹7,58,000',
-    maintenanceCollected: '₹1,84,000',
-    repairsExpense: '₹1,10,500',
-    utilitiesExpense: '₹86,000',
-    staffExpense: '₹68,000',
-    occupancyText: '9 / 12 Rooms (75%)',
-    collectionText: '₹9,17,000 (97.3%)',
-    pendingText: '₹25,000',
-    chartIncomeK: 942,
-    chartExpenseK: 264.5,
-  },
-];
-
 function triggerWebFileDownload(
   filename: string,
   mimeType: string,
@@ -311,33 +71,58 @@ function triggerWebFileDownload(
 }
 
 export default function ReportsView({ onBack, rooms: propRooms }: ReportsViewProps) {
-  const sourceRooms = propRooms && propRooms.length > 0 ? propRooms : INITIAL_ROOMS;
+  const {
+    rooms: contextRooms,
+    rentList,
+    transactions,
+    refreshWorkspace,
+  } = useAppData();
+
+  const sourceRooms = propRooms ?? contextRooms;
   const occupancyStats = buildOccupancyStats(sourceRooms);
-  const roomRows = buildReportRoomRows(sourceRooms);
+  const roomRows = buildReportRoomRows(sourceRooms, rentList);
 
   const [cadence, setCadence] = useState<ReportCadence>('Monthly');
-  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('nov-2026-till');
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>('');
   const [downloadingTarget, setDownloadingTarget] = useState<ReportCadence | 'export' | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
+
+  const weeklyReports = React.useMemo(
+    () => buildDynamicReports('Weekly', transactions, sourceRooms, rentList),
+    [transactions, sourceRooms, rentList]
+  );
+  const monthlyReports = React.useMemo(
+    () => buildDynamicReports('Monthly', transactions, sourceRooms, rentList),
+    [transactions, sourceRooms, rentList]
+  );
+  const yearlyReports = React.useMemo(
+    () => buildDynamicReports('Yearly', transactions, sourceRooms, rentList),
+    [transactions, sourceRooms, rentList]
+  );
 
   const getPeriodList = (targetCadence: ReportCadence): ReportPeriodData[] => {
-    if (targetCadence === 'Weekly') return WEEKLY_REPORTS;
-    if (targetCadence === 'Yearly') return YEARLY_REPORTS;
-    return MONTHLY_REPORTS;
+    if (targetCadence === 'Weekly') return weeklyReports;
+    if (targetCadence === 'Yearly') return yearlyReports;
+    return monthlyReports;
   };
 
   const periodList = getPeriodList(cadence);
   const activePeriod =
     periodList.find((p) => p.id === selectedPeriodId) ?? periodList[periodList.length - 1];
 
-  const maxChartValue = cadence === 'Yearly' ? 1050 : cadence === 'Monthly' ? 100 : 45;
+  const maxChartValue = Math.max(
+    10,
+    ...periodList.map((p) => Math.max(p.chartIncomeK, p.chartExpenseK) * 1.15)
+  );
   const chartScale = 100 / maxChartValue;
 
   const handleSwitchCadence = (nextCadence: ReportCadence) => {
@@ -398,6 +183,8 @@ export default function ReportsView({ onBack, rooms: propRooms }: ReportsViewPro
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -639,15 +426,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,

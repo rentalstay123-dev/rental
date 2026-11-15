@@ -83,7 +83,12 @@ export default function PropertiesView() {
   });
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.container}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      contentContainerStyle={styles.container}
+    >
       {/* Top Header Row */}
       <View style={styles.headerRow}>
         <View>

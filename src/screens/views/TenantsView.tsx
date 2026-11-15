@@ -11,9 +11,12 @@ import {
   TextInput,
   TouchableWithoutFeedback,
   RefreshControl,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius } from '../../constants/theme';
+import { useAppData } from '../../context/AppDataContext';
+import { formatShortDate } from '../../utils/finance';
 
 interface TenantsViewProps {
   onBack?: () => void;
@@ -29,65 +32,27 @@ interface Resident {
   status: 'Active' | 'Ending Soon';
 }
 
-const INITIAL_RESIDENTS: Resident[] = [
-  {
-    id: '1',
-    name: 'Anil Rao',
-    room: 'Room 101',
-    rent: '₹9,000',
-    phone: '+91 98450 11223',
-    moveIn: 'Jan 15, 2026',
-    status: 'Active',
-  },
-  {
-    id: '2',
-    name: 'Priya Sharma',
-    room: 'Room 102',
-    rent: '₹8,500',
-    phone: '+91 98765 43210',
-    moveIn: 'Mar 01, 2026',
-    status: 'Ending Soon',
-  },
-  {
-    id: '3',
-    name: 'Kiran Das',
-    room: 'Room 103',
-    rent: '₹9,000',
-    phone: '+91 98123 45678',
-    moveIn: 'Feb 10, 2026',
-    status: 'Active',
-  },
-  {
-    id: '4',
-    name: 'Sana Khan',
-    room: 'Room 104',
-    rent: '₹9,500',
-    phone: '+91 97400 99881',
-    moveIn: 'Apr 05, 2026',
-    status: 'Active',
-  },
-  {
-    id: '5',
-    name: 'Arjun Kumar',
-    room: 'Room 201',
-    rent: '₹10,000',
-    phone: '+91 99001 22334',
-    moveIn: 'May 12, 2026',
-    status: 'Active',
-  },
-  {
-    id: '6',
-    name: 'Sneha Patel',
-    room: 'Room 202',
-    rent: '₹8,000',
-    phone: '+91 94480 33445',
-    moveIn: 'Jun 20, 2026',
-    status: 'Active',
-  },
-];
-
 export default function TenantsView({ onBack }: TenantsViewProps) {
-  const [residents, setResidents] = useState<Resident[]>(INITIAL_RESIDENTS);
+  const { rooms, upsertSingleRoom, settings, refreshWorkspace } = useAppData();
+
+  const residents: Resident[] = React.useMemo(
+    () =>
+      rooms
+        .filter((r) => r.status !== 'Vacant' && r.members.length > 0)
+        .flatMap((r) =>
+          r.members.map((m) => ({
+            id: `${r.id}-${m.id}`,
+            name: m.name,
+            room: r.roomNumber,
+            rent: r.monthlyRent,
+            phone: m.phone,
+            moveIn: r.joinedDate || 'This Month',
+            status: (r.status === 'Rent due' ? 'Ending Soon' : 'Active') as Resident['status'],
+          }))
+        ),
+    [rooms]
+  );
+
   const [filter, setFilter] = useState<'All' | 'Active' | 'Ending Soon'>('All');
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -97,12 +62,14 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
   const [newPhone, setNewPhone] = useState('');
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
 
   const filteredResidents = residents.filter((r) => {
     const matchesFilter = filter === 'All' ? true : r.status === filter;
@@ -118,29 +85,61 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
       Alert.alert('Required', 'Please enter resident name, room number, and rent');
       return;
     }
-    const newRes: Resident = {
-      id: Date.now().toString(),
+    const formattedRoom = newRoom.trim().startsWith('Room') ? newRoom.trim() : `Room ${newRoom.trim()}`;
+    const existingRoom = rooms.find(
+      (r) => r.roomNumber.toLowerCase() === formattedRoom.toLowerCase()
+    );
+    const rentNum = parseInt(newRent.replace(/[^0-9]/g, ''), 10) || 9000;
+    const formattedRent = `₹${rentNum.toLocaleString('en-IN')}`;
+    const member = {
+      id: `m-${Date.now()}`,
       name: newName.trim(),
-      room: newRoom.trim().startsWith('Room') ? newRoom.trim() : `Room ${newRoom.trim()}`,
-      rent: `₹${parseInt(newRent, 10).toLocaleString('en-IN')}`,
+      role: 'Primary Resident',
       phone: newPhone.trim() || '+91 98000 00000',
-      moveIn: 'This Month',
-      status: 'Active',
     };
-    setResidents([newRes, ...residents]);
+
+    if (existingRoom) {
+      void upsertSingleRoom({
+        ...existingRoom,
+        status: 'Occupied',
+        monthlyRent: formattedRent,
+        joinedDate: existingRoom.joinedDate || formatShortDate(),
+        members: [...existingRoom.members, member],
+      });
+    } else {
+      const floor = settings.floors[0] || 'Floor 1';
+      void upsertSingleRoom({
+        id: `${Date.now()}`,
+        roomNumber: formattedRoom,
+        floor,
+        wing: floor,
+        type: settings.roomTypes[0] || '1 BHK',
+        monthlyRent: formattedRent,
+        depositAmount: `₹${(rentNum * 2).toLocaleString('en-IN')}`,
+        status: 'Occupied',
+        joinedDate: formatShortDate(),
+        members: [member],
+      });
+    }
+
     setNewName('');
     setNewRoom('');
     setNewRent('');
     setNewPhone('');
     setIsAddModalOpen(false);
-    Alert.alert('Resident Added', `${newRes.name} assigned to ${newRes.room}.`);
+    Alert.alert('Resident Added', `${member.name} assigned to ${formattedRoom}.`);
   };
 
   return (
-    <View style={styles.outerScreen}>
+    <KeyboardAvoidingView
+      style={styles.outerScreen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView
         style={{ flex: 1 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -275,7 +274,10 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
 
       {/* Add Resident Modal */}
       <Modal visible={isAddModalOpen} transparent animationType="fade" onRequestClose={() => setIsAddModalOpen(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
           <TouchableWithoutFeedback onPress={() => setIsAddModalOpen(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
@@ -288,64 +290,70 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Full Name</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. Ramesh Hegde"
-              placeholderTextColor={Palette.textMuted}
-              value={newName}
-              onChangeText={setNewName}
-            />
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+            >
+              <Text style={styles.inputLabel}>Full Name</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. Ramesh Hegde"
+                placeholderTextColor={Palette.textMuted}
+                value={newName}
+                onChangeText={setNewName}
+              />
 
-            <Text style={styles.inputLabel}>Room Number</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. Room 204"
-              placeholderTextColor={Palette.textMuted}
-              value={newRoom}
-              onChangeText={setNewRoom}
-            />
+              <Text style={styles.inputLabel}>Room Number</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. Room 204"
+                placeholderTextColor={Palette.textMuted}
+                value={newRoom}
+                onChangeText={setNewRoom}
+              />
 
-            <Text style={styles.inputLabel}>Monthly Rent (₹)</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. 9500"
-              placeholderTextColor={Palette.textMuted}
-              keyboardType="numeric"
-              value={newRent}
-              onChangeText={setNewRent}
-            />
+              <Text style={styles.inputLabel}>Monthly Rent (₹)</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. 9500"
+                placeholderTextColor={Palette.textMuted}
+                keyboardType="numeric"
+                value={newRent}
+                onChangeText={setNewRent}
+              />
 
-            <Text style={styles.inputLabel}>Phone Number</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g. +91 98765 00000"
-              placeholderTextColor={Palette.textMuted}
-              keyboardType="phone-pad"
-              value={newPhone}
-              onChangeText={setNewPhone}
-            />
+              <Text style={styles.inputLabel}>Phone Number</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="e.g. +91 98765 00000"
+                placeholderTextColor={Palette.textMuted}
+                keyboardType="phone-pad"
+                value={newPhone}
+                onChangeText={setNewPhone}
+              />
 
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setIsAddModalOpen(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleAddResident}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.saveButtonText}>Add Resident</Text>
-              </TouchableOpacity>
-            </View>
+              <View style={styles.modalActionRow}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setIsAddModalOpen(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleAddResident}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.saveButtonText}>Add Resident</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -372,15 +380,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: 26,
@@ -580,6 +583,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 380,
+    maxHeight: '85%',
     backgroundColor: Palette.surface,
     borderRadius: Radius.md,
     padding: 20,

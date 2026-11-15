@@ -15,101 +15,312 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import {
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth, getFirebaseAuthErrorMessage } from '../config/firebase';
+import {
+  fetchUserRole,
+  initializeCustomerProfile,
+  initializeRegisteredUserProfile,
+  saveUserRole,
+} from '../services/firestoreService';
+import type { UserRole } from '../types/appData';
+import {
+  getBuiltInRoleByEmail,
+  LOCAL_SESSION_STORAGE_KEY,
+  matchBuiltInAccount,
+} from '../constants/authAccounts';
 import LuvoraLogo from '../components/LuvoraLogo';
 import { Palette, Radius, Typography } from '../constants/theme';
 
 interface LoginScreenProps {
-  onLoginSuccess?: (user: { email: string; role: string }) => void;
+  onAuthHoldChange?: (holding: boolean) => void;
+  onLoginSuccess?: (user: { uid: string; email: string; displayName?: string; role: UserRole }) => void;
 }
 
-export const OWNER_CREDENTIALS = {
-  email: 'owner@luvora.com',
-  password: 'password123',
-};
-
-export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginScreenProps) {
   const insets = useSafeAreaInsets();
 
-  const [email, setEmail] = useState('owner@luvora.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
   // Modals for Forgot Password and Registration
   const [isForgotModalVisible, setIsForgotModalVisible] = useState(false);
   const [isRegisterModalVisible, setIsRegisterModalVisible] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('owner@luvora.com');
+  const [regRole, setRegRole] = useState<UserRole>('owner');
+  const [forgotEmail, setForgotEmail] = useState('');
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regProperty, setRegProperty] = useState('');
+  const [regRoomNumber, setRegRoomNumber] = useState('');
   const [regPassword, setRegPassword] = useState('');
 
-  const handleSignIn = () => {
-    if (!email.trim() || !password) {
-      Alert.alert('Required Fields', 'Please enter your email and password.');
+  const resolveAccountRole = async (uid: string): Promise<UserRole> => {
+    try {
+      const remoteRole = await fetchUserRole(uid);
+      if (remoteRole) return remoteRole;
+    } catch {
+      // Fallback to local cache when offline
+    }
+    try {
+      const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
+      if (cached === 'owner' || cached === 'customer') return cached;
+    } catch {
+      // Ignore storage read errors
+    }
+    return 'owner';
+  };
+
+  const handleSignIn = async () => {
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setAuthError('Please enter your email and password.');
       return;
     }
 
+    setAuthError(null);
+    setAuthSuccess(null);
     setIsLoading(true);
+    onAuthHoldChange?.(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
+    const builtIn = matchBuiltInAccount(trimmedEmail, password);
+
+    const completeLocalFallback = async () => {
+      if (!builtIn) return false;
+      const localSession = {
+        uid: builtIn.localUid,
+        email: builtIn.email,
+        displayName: builtIn.displayName,
+        role: builtIn.role,
+      };
+      try {
+        await AsyncStorage.setItem(LOCAL_SESSION_STORAGE_KEY, JSON.stringify(localSession));
+      } catch {
+        // Ignore storage errors
+      }
+      onLoginSuccess?.(localSession);
+      onAuthHoldChange?.(false);
+      return true;
+    };
+
+    try {
+      const credential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+      const uid = credential.user.uid;
+      const finalRole =
+        getBuiltInRoleByEmail(credential.user.email ?? trimmedEmail) ??
+        (await resolveAccountRole(uid));
+
+      try {
+        await AsyncStorage.setItem(`@luvora_role_${uid}`, finalRole);
+        await AsyncStorage.removeItem(LOCAL_SESSION_STORAGE_KEY);
+      } catch {
+        // Ignore storage error
+      }
+
+      onLoginSuccess?.({
+        uid,
+        email: credential.user.email ?? trimmedEmail,
+        displayName: credential.user.displayName ?? builtIn?.displayName ?? undefined,
+        role: finalRole,
+      });
+      onAuthHoldChange?.(false);
+    } catch (error) {
+      const code = (error as { code?: string })?.code;
+      if (
+        builtIn &&
+        (code === 'auth/user-not-found' || code === 'auth/invalid-credential')
+      ) {
+        try {
+          const created = await createUserWithEmailAndPassword(
+            auth,
+            builtIn.email,
+            builtIn.password
+          );
+          await updateProfile(created.user, { displayName: builtIn.displayName });
+          try {
+            await AsyncStorage.setItem(`@luvora_role_${created.user.uid}`, builtIn.role);
+            await AsyncStorage.removeItem(LOCAL_SESSION_STORAGE_KEY);
+          } catch {
+            // Ignore cache error
+          }
+          try {
+            if (builtIn.role === 'customer') {
+              await initializeCustomerProfile(created.user.uid, {
+                email: builtIn.email,
+                fullName: builtIn.displayName,
+                roomNumber: builtIn.roomNumber,
+                propertyName: builtIn.propertyName,
+              });
+            } else {
+              await initializeRegisteredUserProfile(created.user.uid, {
+                email: builtIn.email,
+                fullName: builtIn.displayName,
+                propertyName: builtIn.propertyName,
+              });
+            }
+          } catch {
+            // Non-fatal if Firestore is offline
+          }
+          onLoginSuccess?.({
+            uid: created.user.uid,
+            email: builtIn.email,
+            displayName: builtIn.displayName,
+            role: builtIn.role,
+          });
+          onAuthHoldChange?.(false);
+          return;
+        } catch (createErr) {
+          const createCode = (createErr as { code?: string })?.code;
+          if (
+            createCode === 'auth/network-request-failed' ||
+            createCode === 'auth/operation-not-allowed'
+          ) {
+            if (await completeLocalFallback()) return;
+          }
+          onAuthHoldChange?.(false);
+          setAuthError(getFirebaseAuthErrorMessage(createErr));
+          return;
+        }
+      }
 
       if (
-        email.trim().toLowerCase() === OWNER_CREDENTIALS.email.toLowerCase() &&
-        password === OWNER_CREDENTIALS.password
+        builtIn &&
+        (code === 'auth/network-request-failed' || code === 'auth/operation-not-allowed')
       ) {
-        if (onLoginSuccess) {
-          onLoginSuccess({ email: email.trim(), role: 'owner' });
-        }
-      } else {
+        if (await completeLocalFallback()) return;
+      }
+
+      onAuthHoldChange?.(false);
+      setAuthError(getFirebaseAuthErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const closeForgotModal = () => {
+    if (!isModalLoading) {
+      setIsForgotModalVisible(false);
+    }
+  };
+
+  const closeRegisterModal = () => {
+    if (!isModalLoading) {
+      setIsRegisterModalVisible(false);
+    }
+  };
+
+  const openForgotModal = () => {
+    setForgotEmail(email.trim());
+    setModalError(null);
+    setIsForgotModalVisible(true);
+  };
+
+  const openRegisterModal = () => {
+    setModalError(null);
+    setIsRegisterModalVisible(true);
+  };
+
+  const handleSendResetEmail = async () => {
+    const trimmedEmail = forgotEmail.trim();
+    if (!trimmedEmail) {
+      setModalError('Please enter your registered email address.');
+      return;
+    }
+
+    setModalError(null);
+    setIsModalLoading(true);
+
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+      setIsForgotModalVisible(false);
+      setAuthError(null);
+      setAuthSuccess(
+        `Password reset instructions sent to ${trimmedEmail}. Check your inbox or spam folder.`
+      );
+      if (Platform.OS !== 'web') {
         Alert.alert(
-          'Invalid Credentials',
-          'Demo Owner Credentials:\nID: ' + OWNER_CREDENTIALS.email + '\nPassword: ' + OWNER_CREDENTIALS.password,
-          [
-            {
-              text: 'Auto-fill & Login',
-              onPress: () => {
-                setEmail(OWNER_CREDENTIALS.email);
-                setPassword(OWNER_CREDENTIALS.password);
-                if (onLoginSuccess) {
-                  onLoginSuccess({ email: OWNER_CREDENTIALS.email, role: 'owner' });
-                }
-              },
-            },
-            { text: 'Try Again' },
-          ]
+          'Reset Link Sent',
+          `Password reset instructions have been dispatched to ${trimmedEmail}.`
         );
       }
-    }, 600);
+    } catch (error) {
+      setModalError(getFirebaseAuthErrorMessage(error, 'Could not send reset email.'));
+    } finally {
+      setIsModalLoading(false);
+    }
   };
 
-  const handleSendResetEmail = () => {
-    if (!forgotEmail.trim()) {
-      Alert.alert('Required', 'Please enter your registered email address.');
-      return;
-    }
-    setIsForgotModalVisible(false);
-    Alert.alert(
-      'Reset Link Sent',
-      `Password reset instructions have been dispatched to ${forgotEmail.trim()}.\n\nDemo Credentials:\nID: ${OWNER_CREDENTIALS.email}\nPassword: ${OWNER_CREDENTIALS.password}`
-    );
-  };
+  const handleRegisterSubmit = async () => {
+    const trimmedName = regName.trim();
+    const trimmedEmail = regEmail.trim();
 
-  const handleRegisterSubmit = () => {
-    if (!regName.trim() || !regEmail.trim() || !regPassword.trim()) {
-      Alert.alert('Required Fields', 'Please fill in your name, email, and password.');
+    if (!trimmedName || !trimmedEmail || !regPassword) {
+      setModalError('Please fill in your name, email, and password.');
       return;
     }
-    setIsRegisterModalVisible(false);
-    Alert.alert(
-      'Account Created',
-      `Welcome to Luvora, ${regName.trim()}! You can now log in using ${regEmail.trim()}.`
-    );
-    setEmail(regEmail.trim());
-    setPassword(regPassword);
+    if (regPassword.length < 6) {
+      setModalError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setModalError(null);
+    setIsModalLoading(true);
+    onAuthHoldChange?.(true);
+
+    try {
+      const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, regPassword);
+      await updateProfile(credential.user, { displayName: trimmedName });
+      try {
+        await AsyncStorage.setItem(`@luvora_role_${credential.user.uid}`, regRole);
+      } catch {
+        // Ignore local cache write error
+      }
+      try {
+        if (regRole === 'customer') {
+          await initializeCustomerProfile(credential.user.uid, {
+            email: credential.user.email ?? trimmedEmail,
+            fullName: trimmedName,
+            roomNumber: regRoomNumber.trim(),
+            propertyName: regProperty.trim(),
+          });
+        } else {
+          await initializeRegisteredUserProfile(credential.user.uid, {
+            email: credential.user.email ?? trimmedEmail,
+            fullName: trimmedName,
+            propertyName: regProperty.trim(),
+          });
+          await saveUserRole(credential.user.uid, 'owner');
+        }
+      } catch {
+        // Non-fatal: dashboard initialization will fall back gracefully if Firestore is offline.
+      }
+      setIsRegisterModalVisible(false);
+      onLoginSuccess?.({
+        uid: credential.user.uid,
+        email: credential.user.email ?? trimmedEmail,
+        displayName: trimmedName,
+        role: regRole,
+      });
+      onAuthHoldChange?.(false);
+    } catch (error) {
+      onAuthHoldChange?.(false);
+      setModalError(getFirebaseAuthErrorMessage(error, 'Could not create account.'));
+    } finally {
+      setIsModalLoading(false);
+    }
   };
 
   return (
@@ -131,7 +342,19 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           {/* Form Card */}
           <View style={styles.cardContainer}>
             <Text style={styles.welcomeTitle}>Welcome back</Text>
-            <Text style={styles.welcomeSubtitle}>Sign in to manage your rental properties</Text>
+            <Text style={styles.welcomeSubtitle}>Sign in to your Luvora account</Text>
+
+            {authError ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{authError}</Text>
+              </View>
+            ) : null}
+
+            {authSuccess ? (
+              <View style={styles.successBanner}>
+                <Text style={styles.successBannerText}>{authSuccess}</Text>
+              </View>
+            ) : null}
 
             {/* Email Field */}
             <View style={styles.inputGroup}>
@@ -157,7 +380,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   autoCorrect={false}
                   accessibilityLabel="Email address"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(value) => {
+                    setEmail(value);
+                    if (authError) setAuthError(null);
+                  }}
                   onFocus={() => setIsEmailFocused(true)}
                   onBlur={() => setIsEmailFocused(false)}
                 />
@@ -188,7 +414,10 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                   autoCorrect={false}
                   accessibilityLabel="Password"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    if (authError) setAuthError(null);
+                  }}
                   onFocus={() => setIsPasswordFocused(true)}
                   onBlur={() => setIsPasswordFocused(false)}
                 />
@@ -209,7 +438,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
               {/* Forgot Password Link grouped directly under password input */}
               <TouchableOpacity
-                onPress={() => setIsForgotModalVisible(true)}
+                onPress={openForgotModal}
                 style={styles.forgotPasswordButton}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 activeOpacity={0.7}
@@ -247,7 +476,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             {/* Don't have an account? Create account */}
             <View style={styles.createAccountRow}>
               <Text style={styles.noAccountText}>{"Don't have an account? "}</Text>
-              <TouchableOpacity onPress={() => setIsRegisterModalVisible(true)} activeOpacity={0.7}>
+              <TouchableOpacity onPress={openRegisterModal} activeOpacity={0.7}>
                 <Text style={styles.createAccountText}>Create account</Text>
               </TouchableOpacity>
             </View>
@@ -260,25 +489,31 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         visible={isForgotModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsForgotModalVisible(false)}
+        onRequestClose={closeForgotModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <TouchableWithoutFeedback onPress={() => setIsForgotModalVisible(false)}>
+          <TouchableWithoutFeedback onPress={closeForgotModal}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalTitle}>Reset Password</Text>
-              <TouchableOpacity onPress={() => setIsForgotModalVisible(false)}>
+              <TouchableOpacity onPress={closeForgotModal} disabled={isModalLoading}>
                 <Feather name="x" size={20} color={Palette.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalSubtitle}>
               Enter your email address and we will send you password reset instructions.
             </Text>
+
+            {modalError ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{modalError}</Text>
+              </View>
+            ) : null}
 
             <Text style={styles.inputLabel}>Registered email</Text>
             <TextInput
@@ -287,22 +522,25 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
               placeholderTextColor={Palette.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
               value={forgotEmail}
-              onChangeText={setForgotEmail}
+              onChangeText={(value) => {
+                setForgotEmail(value);
+                if (modalError) setModalError(null);
+              }}
             />
 
-            <View style={styles.demoCredentialsBox}>
-              <Text style={styles.demoBoxTitle}>Demo Owner Credentials</Text>
-              <Text style={styles.demoBoxText}>Email: {OWNER_CREDENTIALS.email}</Text>
-              <Text style={styles.demoBoxText}>Password: {OWNER_CREDENTIALS.password}</Text>
-            </View>
-
             <TouchableOpacity
-              style={styles.modalPrimaryBtn}
+              style={[styles.modalPrimaryBtn, isModalLoading && styles.signInButtonDisabled]}
               onPress={handleSendResetEmail}
               activeOpacity={0.85}
+              disabled={isModalLoading}
             >
-              <Text style={styles.modalPrimaryBtnText}>Send Reset Link</Text>
+              {isModalLoading ? (
+                <ActivityIndicator color={Palette.surface} size="small" />
+              ) : (
+                <Text style={styles.modalPrimaryBtnText}>Send Reset Link</Text>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -313,47 +551,103 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         visible={isRegisterModalVisible}
         transparent
         animationType="fade"
-        onRequestClose={() => setIsRegisterModalVisible(false)}
+        onRequestClose={closeRegisterModal}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.modalOverlay}
         >
-          <TouchableWithoutFeedback onPress={() => setIsRegisterModalVisible(false)}>
+          <TouchableWithoutFeedback onPress={closeRegisterModal}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
           <View style={styles.modalCard}>
             <View style={styles.modalHeaderRow}>
               <Text style={styles.modalTitle}>Create Account</Text>
-              <TouchableOpacity onPress={() => setIsRegisterModalVisible(false)}>
+              <TouchableOpacity onPress={closeRegisterModal} disabled={isModalLoading}>
                 <Feather name="x" size={20} color={Palette.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.modalSubtitle}>
-              Register as a property owner or manager on Luvora.
+              {regRole === 'customer'
+                ? 'Register as a resident / customer on Luvora.'
+                : 'Register as a property owner or manager on Luvora.'}
             </Text>
+
+            <View style={styles.roleSwitchContainer}>
+              {(['owner', 'customer'] as UserRole[]).map((roleOption) => {
+                const isActive = regRole === roleOption;
+                return (
+                  <TouchableOpacity
+                    key={roleOption}
+                    style={[styles.roleSwitchTab, isActive && styles.roleSwitchTabActive]}
+                    onPress={() => {
+                      setRegRole(roleOption);
+                      if (modalError) setModalError(null);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.roleSwitchText,
+                        isActive && styles.roleSwitchTextActive,
+                      ]}
+                    >
+                      {roleOption === 'owner' ? 'Owner / Admin' : 'Customer'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {modalError ? (
+              <View style={styles.errorBanner}>
+                <Text style={styles.errorBannerText}>{modalError}</Text>
+              </View>
+            ) : null}
 
             <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput
               style={styles.modalInputField}
-              placeholder="e.g. Rajesh Sharma"
+              placeholder={regRole === 'customer' ? 'e.g. Priya Sharma' : 'e.g. Rajesh Sharma'}
               placeholderTextColor={Palette.textMuted}
               value={regName}
-              onChangeText={setRegName}
+              onChangeText={(value) => {
+                setRegName(value);
+                if (modalError) setModalError(null);
+              }}
             />
 
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
               style={styles.modalInputField}
-              placeholder="e.g. owner@luvora.com"
+              placeholder={regRole === 'customer' ? 'e.g. resident@luvora.com' : 'e.g. owner@luvora.com'}
               placeholderTextColor={Palette.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
               value={regEmail}
-              onChangeText={setRegEmail}
+              onChangeText={(value) => {
+                setRegEmail(value);
+                if (modalError) setModalError(null);
+              }}
             />
 
-            <Text style={styles.inputLabel}>Primary Property Name</Text>
+            {regRole === 'customer' ? (
+              <>
+                <Text style={styles.inputLabel}>Room Number</Text>
+                <TextInput
+                  style={styles.modalInputField}
+                  placeholder="e.g. Room 102"
+                  placeholderTextColor={Palette.textMuted}
+                  value={regRoomNumber}
+                  onChangeText={setRegRoomNumber}
+                />
+              </>
+            ) : null}
+
+            <Text style={styles.inputLabel}>
+              {regRole === 'customer' ? 'Property Name (Optional)' : 'Primary Property Name'}
+            </Text>
             <TextInput
               style={styles.modalInputField}
               placeholder="e.g. Sunrise Apartments"
@@ -365,19 +659,27 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
             <Text style={styles.inputLabel}>Password</Text>
             <TextInput
               style={styles.modalInputField}
-              placeholder="Create a strong password"
+              placeholder="Minimum 6 characters"
               placeholderTextColor={Palette.textMuted}
               secureTextEntry
               value={regPassword}
-              onChangeText={setRegPassword}
+              onChangeText={(value) => {
+                setRegPassword(value);
+                if (modalError) setModalError(null);
+              }}
             />
 
             <TouchableOpacity
-              style={styles.modalPrimaryBtn}
+              style={[styles.modalPrimaryBtn, isModalLoading && styles.signInButtonDisabled]}
               onPress={handleRegisterSubmit}
               activeOpacity={0.85}
+              disabled={isModalLoading}
             >
-              <Text style={styles.modalPrimaryBtnText}>Register Account</Text>
+              {isModalLoading ? (
+                <ActivityIndicator color={Palette.surface} size="small" />
+              ) : (
+                <Text style={styles.modalPrimaryBtnText}>Register Account</Text>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -427,6 +729,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
     letterSpacing: -0.3,
+  },
+  roleSwitchContainer: {
+    flexDirection: 'row',
+    backgroundColor: Palette.tint,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    padding: 4,
+    marginBottom: 18,
+  },
+  roleSwitchTab: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleSwitchTabActive: {
+    backgroundColor: Palette.primary,
+  },
+  roleSwitchText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Palette.textSecondary,
+  },
+  roleSwitchTextActive: {
+    color: Palette.onPrimary,
   },
   welcomeSubtitle: {
     fontSize: Typography.fontSize.sm,
@@ -567,24 +896,31 @@ const styles = StyleSheet.create({
     color: Palette.text,
     marginBottom: 14,
   },
-  demoCredentialsBox: {
-    backgroundColor: Palette.iconBg,
+  errorBanner: {
+    backgroundColor: Palette.status.overdue.bg,
     borderRadius: Radius.sm,
-    borderWidth: 1,
-    borderColor: Palette.border,
-    padding: 12,
-    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
   },
-  demoBoxTitle: {
+  errorBannerText: {
+    color: Palette.status.overdue.text,
     fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
-    color: Palette.primary,
-    marginBottom: 4,
+    fontWeight: '600',
+    lineHeight: 18,
   },
-  demoBoxText: {
+  successBanner: {
+    backgroundColor: Palette.status.paid.bg,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  successBannerText: {
+    color: Palette.status.paid.text,
     fontSize: Typography.fontSize.xs,
-    color: Palette.text,
-    marginTop: 2,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   modalPrimaryBtn: {
     backgroundColor: Palette.primary,

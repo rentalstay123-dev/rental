@@ -14,42 +14,26 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
+import { useAppData } from '../../context/AppDataContext';
+import type {
+  PaymentMode,
+  PaymentRecord,
+  PaymentStatus,
+  RentFilter,
+  ResolvedRoomRent,
+  RoomRentStatus,
+} from '../../types/appData';
+import { formatShortDate } from '../../utils/finance';
 
-export type RentFilter = 'All' | 'Paid' | 'Due';
+export type { RentFilter };
 
 interface RentViewProps {
   onBack?: () => void;
   initialFilter?: RentFilter;
 }
 
-type PaymentStatus = 'Paid' | 'Pending' | 'Overdue';
-type RoomStatus = 'Paid' | 'Due' | 'Overdue';
-type PaymentMode = 'UPI' | 'Bank Transfer' | 'Cash' | 'Net Banking';
-
-interface PaymentRecord {
-  id: string;
-  title: string;
-  amount: string;
-  date: string;
-  status: PaymentStatus;
-  method?: string;
-}
-
-interface RoomRentDetail {
-  id: string;
-  roomNumber: string;
-  tenantName: string;
-  wing: string;
-  maintenanceAmount: string;
-  monthlyRent: string;
-  numericFullRent: number;
-  advancePayment: string;
-  dueDate: string;
-  paymentCycle: string;
-  currentStatus: RoomStatus;
-  statusBadgeText: string;
-  history: PaymentRecord[];
-}
+type RoomStatus = RoomRentStatus;
+type RoomRentDetail = ResolvedRoomRent;
 
 interface RecordedReceipt {
   roomNumber: string;
@@ -64,103 +48,9 @@ interface RecordedReceipt {
 }
 
 let nextPaymentRecordSeq = 100;
-const getNextPaymentId = () => `h-${++nextPaymentRecordSeq}`;
+const getNextPaymentId = () => `h-${Date.now()}-${++nextPaymentRecordSeq}`;
 
 const PAYMENT_MODES: PaymentMode[] = ['UPI', 'Bank Transfer', 'Cash', 'Net Banking'];
-
-const INITIAL_ROOM_RENT_DATA: RoomRentDetail[] = [
-  {
-    id: '1',
-    roomNumber: 'Room 101',
-    tenantName: 'Anil Rao',
-    wing: 'Floor 1 · East Wing',
-    maintenanceAmount: '₹2,000',
-    monthlyRent: '₹9,000',
-    numericFullRent: 9000,
-    advancePayment: '₹0',
-    dueDate: '1 Nov 2026',
-    paymentCycle: 'Monthly',
-    currentStatus: 'Paid',
-    statusBadgeText: 'Paid',
-    history: [
-      { id: 'h1', title: 'October 2026 Rent', amount: '₹9,000', date: '02 Oct 2026', status: 'Paid', method: 'UPI' },
-      { id: 'h2', title: 'September 2026 Rent', amount: '₹9,000', date: '03 Sep 2026', status: 'Paid', method: 'UPI' },
-    ],
-  },
-  {
-    id: '2',
-    roomNumber: 'Room 102',
-    tenantName: 'Priya Sharma',
-    wing: 'Floor 1 · West Wing',
-    maintenanceAmount: '₹2,000',
-    monthlyRent: '₹15,000',
-    numericFullRent: 15000,
-    advancePayment: '₹0',
-    dueDate: '1 Nov 2026',
-    paymentCycle: 'Monthly',
-    currentStatus: 'Overdue',
-    statusBadgeText: 'Overdue',
-    history: [
-      { id: 'h4', title: 'October 2026 Rent', amount: '₹15,000', date: '01 Oct 2026', status: 'Paid', method: 'UPI' },
-      { id: 'h5', title: 'September 2026 Rent', amount: '₹15,000', date: '01 Sep 2026', status: 'Paid', method: 'UPI' },
-      { id: 'h6', title: 'August 2026 Rent', amount: '₹15,000', date: '01 Aug 2026', status: 'Paid', method: 'UPI' },
-    ],
-  },
-  {
-    id: '3',
-    roomNumber: 'Room 103',
-    tenantName: 'Kiran Das',
-    wing: 'Floor 1 · Garden View',
-    maintenanceAmount: '₹2,000',
-    monthlyRent: '₹9,000',
-    numericFullRent: 9000,
-    advancePayment: '₹9,000',
-    dueDate: '1 Nov 2026',
-    paymentCycle: 'Monthly',
-    currentStatus: 'Paid',
-    statusBadgeText: 'Paid',
-    history: [
-      { id: 'h8', title: 'Advance Payment', amount: '₹9,000', date: '04 Oct 2026', status: 'Paid', method: 'Net Banking' },
-      { id: 'h9', title: 'October 2026 Rent', amount: '₹9,000', date: '04 Oct 2026', status: 'Paid', method: 'Net Banking' },
-    ],
-  },
-  {
-    id: '4',
-    roomNumber: 'Room 104',
-    tenantName: 'Sana Khan',
-    wing: 'Floor 1 · North Wing',
-    maintenanceAmount: '₹2,000',
-    monthlyRent: '₹9,500',
-    numericFullRent: 9500,
-    advancePayment: '₹5,000',
-    dueDate: '1 Nov 2026',
-    paymentCycle: 'Monthly',
-    currentStatus: 'Paid',
-    statusBadgeText: 'Paid',
-    history: [
-      { id: 'h10', title: 'Advance Payment', amount: '₹5,000', date: '01 Oct 2026', status: 'Paid', method: 'UPI' },
-      { id: 'h11', title: 'October 2026 Rent', amount: '₹9,500', date: '01 Oct 2026', status: 'Paid', method: 'UPI' },
-    ],
-  },
-  {
-    id: '5',
-    roomNumber: 'Room 201',
-    tenantName: 'Arjun Kumar',
-    wing: 'Floor 2 · Corner Suite',
-    maintenanceAmount: '₹2,000',
-    monthlyRent: '₹10,000',
-    numericFullRent: 10000,
-    advancePayment: '₹0',
-    dueDate: '1 Nov 2026',
-    paymentCycle: 'Monthly',
-    currentStatus: 'Due',
-    statusBadgeText: 'Due Nov 1',
-    history: [
-      { id: 'h12', title: 'October 2026 Rent', amount: '₹10,000', date: '01 Oct 2026', status: 'Paid', method: 'UPI' },
-      { id: 'h13', title: 'September 2026 Rent', amount: '₹10,000', date: '02 Sep 2026', status: 'Paid', method: 'Cash' },
-    ],
-  },
-];
 
 function getStatusColors(status: RoomStatus | PaymentStatus) {
   if (status === 'Paid') return Palette.status.paid;
@@ -311,7 +201,16 @@ export default function RentView({
   onBack,
   initialFilter = 'All',
 }: RentViewProps) {
-  const [rooms, setRooms] = useState<RoomRentDetail[]>(INITIAL_ROOM_RENT_DATA);
+  const {
+    rentList: rooms,
+    recordRentPayment,
+    markRoomRentDue,
+    refreshWorkspace,
+  } = useAppData();
+
+  const now = new Date();
+  const todayFormatted = formatShortDate(now);
+
   const [filter, setFilter] = useState<RentFilter>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCollectDropdown, setShowCollectDropdown] = useState(false);
@@ -322,10 +221,10 @@ export default function RentView({
 
   // Record Payment form state
   const [amountInput, setAmountInput] = useState('');
-  const [paymentDateInput, setPaymentDateInput] = useState('03 Nov 2026');
+  const [paymentDateInput, setPaymentDateInput] = useState(todayFormatted);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [calendarYear, setCalendarYear] = useState(2026);
-  const [calendarMonth, setCalendarMonth] = useState(10);
+  const [calendarYear, setCalendarYear] = useState(now.getFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(now.getMonth());
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('UPI');
   const [showModePicker, setShowModePicker] = useState(false);
   const [referenceInput, setReferenceInput] = useState('');
@@ -333,12 +232,14 @@ export default function RentView({
   const [recordedReceipt, setRecordedReceipt] = useState<RecordedReceipt | null>(null);
 
   const [refreshing, setRefreshing] = useState(false);
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await refreshWorkspace();
+    } finally {
       setRefreshing(false);
-    }, 1000);
-  }, []);
+    }
+  }, [refreshWorkspace]);
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? null;
 
@@ -368,12 +269,13 @@ export default function RentView({
   };
 
   const handleOpenRecordPayment = (room: RoomRentDetail) => {
+    const currentNow = new Date();
     setShowCollectDropdown(false);
     setSelectedRoomId(room.id);
     setAmountInput(room.monthlyRent.replace(/^₹\s*/, ''));
-    setPaymentDateInput('03 Nov 2026');
-    setCalendarYear(2026);
-    setCalendarMonth(10);
+    setPaymentDateInput(formatShortDate(currentNow));
+    setCalendarYear(currentNow.getFullYear());
+    setCalendarMonth(currentNow.getMonth());
     setShowDatePicker(false);
     setPaymentMode('UPI');
     setShowModePicker(false);
@@ -409,7 +311,7 @@ export default function RentView({
     }
 
     const formattedPaid = formatAmountDisplay(amountInput);
-    const cleanDate = paymentDateInput.trim() || '03 Nov 2026';
+    const cleanDate = paymentDateInput.trim() || formatShortDate();
     const refNote = referenceInput.trim();
 
     const isAlreadyPaidThisMonth = selectedRoom.currentStatus === 'Paid';
@@ -457,20 +359,18 @@ export default function RentView({
     }
 
     const isThisMonthSettled = isAlreadyPaidThisMonth || paidNum >= fullRentNum;
-    setRooms((prev) =>
-      prev.map((r) =>
-        r.id === selectedRoom.id
-          ? {
-              ...r,
-              advancePayment: updatedAdvanceFormatted,
-              dueDate: updatedDueDate,
-              currentStatus: isThisMonthSettled ? 'Paid' : r.currentStatus,
-              statusBadgeText: isThisMonthSettled ? 'Paid' : r.statusBadgeText,
-              history: [...newRecords, ...r.history],
-            }
-          : r
-      )
-    );
+    void recordRentPayment({
+      room: selectedRoom,
+      paidNum,
+      rentAppliedNum,
+      excessAdvanceNum,
+      updatedAdvanceFormatted,
+      updatedDueDate,
+      isThisMonthSettled,
+      newRecords,
+      paymentDate: cleanDate,
+      mode: paymentMode,
+    });
 
     setPaymentError(null);
     setRecordedReceipt({
@@ -537,6 +437,29 @@ export default function RentView({
               <RoomMetaList room={selectedRoom} includeTenant showDividers />
             </View>
 
+            <View style={styles.expandedActionsRow}>
+              {selectedRoom.currentStatus === 'Paid' ? (
+                <TouchableOpacity
+                  style={styles.detailsBtn}
+                  activeOpacity={0.75}
+                  onPress={() => void markRoomRentDue(selectedRoom.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mark ${selectedRoom.roomNumber} rent due`}
+                >
+                  <Text style={styles.detailsBtnText}>Mark Rent Due</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={styles.recordBtn}
+                activeOpacity={0.85}
+                onPress={() => handleOpenRecordPayment(selectedRoom)}
+                accessibilityRole="button"
+                accessibilityLabel={`Record payment for ${selectedRoom.roomNumber}`}
+              >
+                <Text style={styles.recordBtnText}>Record Payment</Text>
+              </TouchableOpacity>
+            </View>
+
             {/* Payment History Section */}
             <View style={styles.historyHeaderRow}>
               <Text style={styles.historySectionTitle}>Payment History</Text>
@@ -553,7 +476,12 @@ export default function RentView({
             </View>
 
             <View style={styles.historyListCard}>
-              {visibleHistory.map((record, index) => {
+              {visibleHistory.length === 0 ? (
+                <View style={styles.emptySearchBox}>
+                  <Text style={styles.emptySearchText}>No payment records yet.</Text>
+                </View>
+              ) : (
+                visibleHistory.map((record, index) => {
                 const isLast = index === visibleHistory.length - 1;
                 const isPaid = record.status === 'Paid';
                 const isAdvanceRecord = record.title.toLowerCase().includes('advance');
@@ -596,7 +524,8 @@ export default function RentView({
                     {!isLast && <View style={styles.rowDivider} />}
                   </View>
                 );
-              })}
+              })
+              )}
             </View>
           </View>
         </ScrollView>
@@ -619,6 +548,7 @@ export default function RentView({
             style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             contentContainerStyle={styles.container}
           >
             <View style={styles.contentWrapper}>
@@ -989,6 +919,7 @@ export default function RentView({
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={styles.container}
         refreshControl={
           <RefreshControl
@@ -1257,15 +1188,10 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   backButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    marginRight: 8,
+    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,

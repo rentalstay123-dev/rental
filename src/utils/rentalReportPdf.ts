@@ -1,4 +1,4 @@
-import type { RoomItem } from '../screens/views/RoomsView';
+import type { ResolvedRoomRent, RoomItem } from '../types/appData';
 
 export type ReportCadence = 'Weekly' | 'Monthly' | 'Yearly';
 
@@ -41,26 +41,34 @@ export interface ReportOccupancyStats {
 }
 
 export function buildOccupancyStats(rooms: RoomItem[]): ReportOccupancyStats {
-  const totalRooms = Math.max(rooms.length, 1);
+  const totalRooms = rooms.length;
   const occupiedRooms = rooms.filter((r) => r.status !== 'Vacant').length;
   const vacantRooms = Math.max(0, totalRooms - occupiedRooms);
+  const denom = Math.max(totalRooms, 1);
   return {
     totalRooms,
     occupiedRooms,
     vacantRooms,
-    occupiedPct: ((occupiedRooms / totalRooms) * 100).toFixed(1),
-    vacantPct: ((vacantRooms / totalRooms) * 100).toFixed(1),
+    occupiedPct: totalRooms > 0 ? ((occupiedRooms / denom) * 100).toFixed(1) : '0.0',
+    vacantPct: totalRooms > 0 ? ((vacantRooms / denom) * 100).toFixed(1) : '0.0',
   };
 }
 
-export function buildReportRoomRows(rooms: RoomItem[]): ReportRoomRow[] {
-  return rooms.slice(0, 8).map((r) => {
+export function buildReportRoomRows(
+  rooms: RoomItem[],
+  rentList?: ResolvedRoomRent[]
+): ReportRoomRow[] {
+  const rentById = new Map((rentList ?? []).map((item) => [item.id, item]));
+  return rooms.slice(0, 12).map((r) => {
     const cleanRent = r.monthlyRent.replace(/^₹\s*/, 'Rs. ');
     const isVacant = r.status === 'Vacant';
-    const isDue = r.status === 'Rent due';
+    const rentEntry = rentById.get(r.id);
+    const isDue = rentEntry
+      ? rentEntry.currentStatus === 'Due' || rentEntry.currentStatus === 'Overdue'
+      : r.status === 'Rent due';
     return {
       room: r.roomNumber,
-      tenant: isVacant ? 'Vacant Unit' : r.members[0]?.name || 'Resident',
+      tenant: isVacant ? 'Vacant Unit' : rentEntry?.tenantName || r.members[0]?.name || 'Resident',
       rentDue: cleanRent,
       received: isVacant || isDue ? 'Rs. 0' : cleanRent,
       status: isVacant ? 'Vacant' : isDue ? 'Pending' : 'Paid',
