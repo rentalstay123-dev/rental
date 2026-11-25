@@ -174,31 +174,31 @@ export function buildRentalIncomeHtmlReport(
   .page:last-child { page-break-after: auto; }
   .top-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1.5px solid #17121D; padding-bottom: 10px; margin-bottom: 18px; }
   .brand-title { font-size: 24px; font-weight: 700; color: #17121D; line-height: 1; }
-  .brand-sub { font-size: 9px; font-weight: 700; color: #68616F; letter-spacing: 1.1px; margin-top: 4px; }
+  .brand-sub { font-size: 9px; font-weight: 700; color: #000000; letter-spacing: 1.1px; margin-top: 4px; }
   .report-meta { text-align: right; }
   .report-type { font-size: 11px; font-weight: 700; color: #17121D; letter-spacing: 0.4px; }
-  .report-period { font-size: 10px; color: #68616F; margin-top: 2px; }
+  .report-period { font-size: 10px; color: #000000; margin-top: 2px; }
   h2 { font-size: 13.5px; font-weight: 700; color: #17121D; margin: 18px 0 6px; }
-  p { margin: 0 0 10px; color: #444444; font-size: 10.5px; }
+  p { margin: 0 0 10px; color: #000000; font-size: 10.5px; }
   .kpi-grid { display: table; width: 100%; border: 1px solid #D4D4D8; background: #F7F7F8; margin-bottom: 6px; table-layout: fixed; }
   .kpi-cell { display: table-cell; padding: 10px 12px; border-right: 1px solid #E4E4E7; vertical-align: top; }
   .kpi-cell:last-child { border-right: none; }
-  .kpi-label { font-size: 8px; font-weight: 700; color: #68616F; letter-spacing: 0.5px; margin-bottom: 4px; text-transform: uppercase; }
+  .kpi-label { font-size: 8px; font-weight: 700; color: #000000; letter-spacing: 0.5px; margin-bottom: 4px; text-transform: uppercase; }
   .kpi-val { font-size: 15px; font-weight: 700; color: #17121D; }
   table.data { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  table.data th { background: #17121D; color: #FFFFFF; text-align: left; padding: 7px 9px; font-size: 10px; font-weight: 700; }
+  table.data th { background: #17121D; color: #F8F5FC; text-align: left; padding: 7px 9px; font-size: 10px; font-weight: 700; }
   table.data th.num, table.data td.num { text-align: right; }
   table.data td { padding: 6.5px 9px; border-bottom: 1px solid #E5E7EB; font-size: 10px; color: #17121D; }
   table.data tr:nth-child(even) td { background: #F8F8FA; }
-  table.data tr.total-row td { font-weight: 700; background: #FFFFFF; border-bottom: 1.5px solid #17121D; }
-  .table-note { font-size: 9px; color: #68616F; margin-top: 6px; }
-  ul.actions { margin: 8px 0 16px; padding-left: 16px; color: #222222; }
+  table.data tr.total-row td { font-weight: 700; background: #F8F5FC; border-bottom: 1.5px solid #17121D; }
+  .table-note { font-size: 9px; color: #000000; margin-top: 6px; }
+  ul.actions { margin: 8px 0 16px; padding-left: 16px; color: #000000; }
   ul.actions li { margin-bottom: 8px; font-size: 10.5px; }
   .signatures { display: table; width: 100%; margin-top: 34px; table-layout: fixed; }
   .sig-col { display: table-cell; width: 50%; padding-right: 28px; vertical-align: top; }
   .sig-title { font-size: 10.5px; font-weight: 700; color: #17121D; margin-bottom: 28px; }
-  .sig-line { border-top: 1px solid #17121D; padding-top: 5px; font-size: 9.5px; color: #68616F; width: 210px; }
-  .page-footer { display: flex; justify-content: space-between; border-top: 1px solid #D4D4D8; padding-top: 8px; margin-top: 18px; font-size: 9px; color: #68616F; }
+  .sig-line { border-top: 1px solid #17121D; padding-top: 5px; font-size: 9.5px; color: #000000; width: 210px; }
+  .page-footer { display: flex; justify-content: space-between; border-top: 1px solid #D4D4D8; padding-top: 8px; margin-top: 18px; font-size: 9px; color: #000000; }
 </style>
 </head>
 <body>

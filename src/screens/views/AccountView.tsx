@@ -292,7 +292,7 @@ export default function ProfileView({ onBack, onLogout, userEmail, userName }: P
               accessibilityRole="button"
               accessibilityLabel="Back to Home"
             >
-              <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+              <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Profile</Text>
           </View>
@@ -674,8 +674,8 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 28,
+    paddingTop: 12,
+    paddingBottom: 24,
     backgroundColor: Palette.background,
   },
   contentWrapper: {
@@ -696,10 +696,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.2,
-    fontFamily: Typography.fontFamily.serif,
+    letterSpacing: -0.3,
   },
   heroCard: {
     flexDirection: 'row',

@@ -820,7 +820,7 @@ export default function SettingsView({
                 activeOpacity={0.7}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Settings</Text>
             </View>
@@ -1883,7 +1883,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 24,
     backgroundColor: Palette.background,
   },
@@ -1896,7 +1896,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -1910,14 +1910,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.3,
-    ...Platform.select({
-      ios: { fontFamily: 'Georgia' },
-      android: { fontFamily: 'serif' },
-      default: { fontFamily: 'serif' },
-    }),
+    letterSpacing: -0.3,
   },
   saveHeaderButton: {
     backgroundColor: Palette.primary,

@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
@@ -13,9 +14,11 @@ import { useAppData } from '../../context/AppDataContext';
 import { formatRupeeAmount } from '../../utils/finance';
 import type { RentFilter } from './RentView';
 
+const netProfitBg = require('../../../assets/net-profit-bg.png');
+
 interface DashboardViewProps {
   onNavigatePage?: (
-    page: 'Rooms' | 'Rent' | 'Money' | 'Accounts' | 'Notifications',
+    page: 'Rooms' | 'Rent' | 'Money' | 'Accounts' | 'Notifications' | 'Requests',
     noticeId?: string,
     rentFilter?: RentFilter
   ) => void;
@@ -85,76 +88,85 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
             dashboardMetrics.netProfit
           )}, view accounts`}
         >
-          <View style={styles.profitHeaderRow}>
-            <Text style={styles.profitHeader}>Net profit · {dashboardMetrics.monthLabel}</Text>
-            <View style={styles.profitBadge}>
-              <Text
-                style={[
-                  styles.profitBadgeText,
-                  isNegativeGrowth && { color: Palette.status.overdue.text },
-                ]}
-              >
-                {growthLabel}
-              </Text>
+          <Image
+            source={netProfitBg}
+            style={styles.profitCardBgImage}
+            resizeMode="cover"
+          />
+          <View style={styles.profitCardContent}>
+            <View style={styles.profitHeaderRow}>
+              <Text style={styles.profitHeader}>Net Income · {dashboardMetrics.monthLabel}</Text>
+              <View style={styles.profitBadge}>
+                <Text
+                  style={[
+                    styles.profitBadgeText,
+                    isNegativeGrowth && { color: Palette.status.overdue.text },
+                  ]}
+                >
+                  {growthLabel}
+                </Text>
+              </View>
             </View>
+            <Text style={styles.profitAmount}>
+              {formatRupeeAmount(dashboardMetrics.netProfit)}
+            </Text>
+            <Text style={styles.profitBreakdown}>
+              Income {formatRupeeAmount(dashboardMetrics.totalIncome)}  ·  Expenses{' '}
+              {formatRupeeAmount(dashboardMetrics.totalExpenses)}
+            </Text>
+            <View
+              style={styles.profitTrack}
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={`Net profit margin: ${dashboardMetrics.marginPct}% of total income`}
+              accessibilityValue={{ min: 0, max: 100, now: dashboardMetrics.marginPct }}
+            >
+              <View style={[styles.profitFill, { width: `${dashboardMetrics.marginPct}%` }]} />
+            </View>
+            
           </View>
-          <Text style={styles.profitAmount}>
-            {formatRupeeAmount(dashboardMetrics.netProfit)}
-          </Text>
-          <Text style={styles.profitBreakdown}>
-            Income {formatRupeeAmount(dashboardMetrics.totalIncome)}  ·  Expenses{' '}
-            {formatRupeeAmount(dashboardMetrics.totalExpenses)}
-          </Text>
-          <View
-            style={styles.profitTrack}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel={`Net profit margin: ${dashboardMetrics.marginPct}% of total income`}
-            accessibilityValue={{ min: 0, max: 100, now: dashboardMetrics.marginPct }}
-          >
-            <View style={[styles.profitFill, { width: `${dashboardMetrics.marginPct}%` }]} />
-          </View>
-          <Text style={styles.profitScaleText}>
-            {dashboardMetrics.marginPct}% net margin of total income
-          </Text>
         </TouchableOpacity>
 
         {/* 2-Column Metric Cards */}
         <View style={styles.metricRow}>
           {/* Rooms occupied */}
-          <TouchableOpacity
-            style={styles.metricCard}
-            activeOpacity={0.85}
-            onPress={() => onNavigatePage && onNavigatePage('Rooms')}
-            accessibilityRole="button"
-            accessibilityLabel={`Rooms occupied ${dashboardMetrics.occupiedRooms} of ${dashboardMetrics.totalRooms}, ${dashboardMetrics.vacantRooms} vacant, view rooms`}
-          >
-            <Text style={styles.metricLabel}>Rooms occupied</Text>
-            <Text style={styles.metricValue}>
-              {dashboardMetrics.occupiedRooms} / {dashboardMetrics.totalRooms}
-            </Text>
-            <Text style={styles.metricSubtext}>{dashboardMetrics.vacantRooms} vacant</Text>
-          </TouchableOpacity>
+          <View style={styles.metricCol}>
+            <Text style={styles.metricHeading}>Rooms occupied</Text>
+            <TouchableOpacity
+              style={styles.metricCard}
+              activeOpacity={0.85}
+              onPress={() => onNavigatePage && onNavigatePage('Rooms')}
+              accessibilityRole="button"
+              accessibilityLabel={`Rooms occupied ${dashboardMetrics.occupiedRooms} of ${dashboardMetrics.totalRooms}, ${dashboardMetrics.vacantRooms} vacant, view rooms`}
+            >
+              <Text style={styles.metricValue}>
+                {dashboardMetrics.occupiedRooms} / {dashboardMetrics.totalRooms}
+              </Text>
+              <Text style={styles.metricSubtext}>{dashboardMetrics.vacantRooms} vacant</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Rent pending */}
-          <TouchableOpacity
-            style={styles.metricCard}
-            activeOpacity={0.85}
-            onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
-            accessibilityRole="button"
-            accessibilityLabel={`Rent pending ${formatRupeeAmount(
-              dashboardMetrics.pendingRentTotal
-            )}, ${dashboardMetrics.pendingRoomsCount} rooms due, view rent`}
-          >
-            <Text style={styles.metricLabel}>Rent pending</Text>
-            <Text style={[styles.metricValue, { color: Palette.primary }]}>
-              {formatRupeeAmount(dashboardMetrics.pendingRentTotal)}
-            </Text>
-            <Text style={styles.metricSubtext}>
-              {dashboardMetrics.pendingRoomsCount}{' '}
-              {dashboardMetrics.pendingRoomsCount === 1 ? 'room' : 'rooms'} due
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.metricCol}>
+            <Text style={styles.metricHeading}>Rent pending</Text>
+            <TouchableOpacity
+              style={styles.metricCard}
+              activeOpacity={0.85}
+              onPress={() => onNavigatePage && onNavigatePage('Rent', undefined, 'Due')}
+              accessibilityRole="button"
+              accessibilityLabel={`Rent pending ${formatRupeeAmount(
+                dashboardMetrics.pendingRentTotal
+              )}, ${dashboardMetrics.pendingRoomsCount} rooms due, view rent`}
+            >
+              <Text style={[styles.metricValue, { color: Palette.primary }]}>
+                {formatRupeeAmount(dashboardMetrics.pendingRentTotal)}
+              </Text>
+              <Text style={styles.metricSubtext}>
+                {dashboardMetrics.pendingRoomsCount}{' '}
+                {dashboardMetrics.pendingRoomsCount === 1 ? 'room' : 'rooms'} due
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Section: Rent Due */}
@@ -209,7 +221,7 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
                         </View>
                       </View>
                       <Text style={styles.pendingTenantText}>
-                        {item.tenantName} · Due {item.dueDate}
+                        {item.tenantName}
                       </Text>
                     </View>
                     <View style={styles.rowRightAction}>
@@ -238,7 +250,7 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
             <TouchableOpacity
               style={styles.headerRequestButton}
               activeOpacity={0.7}
-              onPress={() => onNavigatePage && onNavigatePage('Notifications')}
+              onPress={() => onNavigatePage && onNavigatePage('Requests')}
               accessibilityRole="button"
               accessibilityLabel="Request"
             >
@@ -252,10 +264,10 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
             <TouchableOpacity
               style={styles.emptyCardRow}
               activeOpacity={0.7}
-              onPress={() => onNavigatePage && onNavigatePage('Notifications')}
+              onPress={() => onNavigatePage && onNavigatePage('Requests')}
             >
               <Text style={styles.emptyCardText}>
-                No active service requests. Tap to open Notifications.
+                No active service requests. Tap to open Requests.
               </Text>
             </TouchableOpacity>
           ) : (
@@ -266,7 +278,7 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
                   <TouchableOpacity
                     style={styles.messageItem}
                     activeOpacity={0.7}
-                    onPress={() => onNavigatePage && onNavigatePage('Notifications', msg.id)}
+                    onPress={() => onNavigatePage && onNavigatePage('Requests', msg.id)}
                     accessibilityRole="button"
                     accessibilityLabel={`${msg.senderName || 'Resident'}, ${msg.roomNumber || ''}, ${msg.tag}, open message`}
                   >
@@ -318,13 +330,27 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   profitCard: {
-    backgroundColor: Palette.surface,
-    borderRadius: 5,
+    backgroundColor: '#E0D2F7',
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: Palette.border,
+    marginBottom: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profitCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  profitCardContent: {
+    width: '100%',
     paddingVertical: 20,
     paddingHorizontal: 20,
-    marginBottom: 14,
   },
   profitHeaderRow: {
     flexDirection: 'row',
@@ -380,19 +406,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  metricCard: {
+  metricCol: {
     width: '48.5%',
+  },
+  metricHeading: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  metricCard: {
     backgroundColor: Palette.surface,
     borderRadius: 5,
     padding: 16,
     borderWidth: 1,
     borderColor: Palette.border,
-  },
-  metricLabel: {
-    fontSize: Typography.fontSize.sm,
-    color: Palette.textSecondary,
-    fontWeight: '500',
-    marginBottom: 6,
   },
   metricValue: {
     fontSize: Typography.fontSize.xl,
@@ -424,9 +452,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   viewAllText: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.viewAll,
     fontWeight: '700',
     color: Palette.primary,
+    textDecorationLine: 'underline',
+    textDecorationColor: Palette.primary,
   },
   cardContainer: {
     backgroundColor: Palette.surface,

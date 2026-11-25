@@ -41,7 +41,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 8,
     letterSpacing: 0.8,
-    fontFamily: Typography.fontFamily.serif,
   },
 });
 

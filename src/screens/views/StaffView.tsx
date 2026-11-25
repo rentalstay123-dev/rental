@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -13,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { PaySalaryIcon } from '../../components/CustomIcons';
 import { DEFAULT_STAFF_ROLES } from '../../constants/initialData';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useAppData } from '../../context/AppDataContext';
@@ -31,6 +33,7 @@ type FilterOption = 'All' | StaffStatus;
 
 const STAFF_SHIFTS: StaffShift[] = ['Full Day', 'Morning', 'Night', 'On Call'];
 const STAFF_STATUSES: StaffStatus[] = ['Active', 'On Leave'];
+const STAFF_CARD_BG = require('../../../assets/accounts-card-bg.jpg');
 
 interface NoticeState {
   tone: 'success' | 'error';
@@ -51,7 +54,7 @@ interface StaffFormState {
 function createEmptyFormState(): StaffFormState {
   return {
     name: '',
-    role: DEFAULT_STAFF_ROLES[0] ?? 'Caretaker',
+    role: '',
     phone: '',
     salaryInput: '',
     shift: 'Full Day',
@@ -109,6 +112,51 @@ export default function StaffView({ onBack }: StaffViewProps) {
   const [formState, setFormState] = useState<StaffFormState>(createEmptyFormState);
   const [formError, setFormError] = useState<string | null>(null);
   const [isSavingForm, setIsSavingForm] = useState(false);
+  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  const [customRoles, setCustomRoles] = useState<string[]>([]);
+  const [roleSearchText, setRoleSearchText] = useState('');
+
+  const availableRoles = useMemo(() => {
+    const list: string[] = [...DEFAULT_STAFF_ROLES];
+    staff.forEach((s) => {
+      const r = s.role?.trim();
+      if (r && !list.some((item) => item.toLowerCase() === r.toLowerCase())) {
+        list.push(r);
+      }
+    });
+    customRoles.forEach((r) => {
+      const trimmed = r.trim();
+      if (trimmed && !list.some((item) => item.toLowerCase() === trimmed.toLowerCase())) {
+        list.push(trimmed);
+      }
+    });
+    return list;
+  }, [staff, customRoles]);
+
+  const trimmedRoleSearch = roleSearchText.trim();
+  const filteredRoles = useMemo(() => {
+    if (!trimmedRoleSearch) return availableRoles;
+    const q = trimmedRoleSearch.toLowerCase();
+    return availableRoles.filter((r) => r.toLowerCase().includes(q));
+  }, [availableRoles, trimmedRoleSearch]);
+
+  const canAddTypedRole = useMemo(() => {
+    if (!trimmedRoleSearch) return false;
+    return !availableRoles.some(
+      (r) => r.toLowerCase() === trimmedRoleSearch.toLowerCase()
+    );
+  }, [availableRoles, trimmedRoleSearch]);
+
+  const handleAddRoleFromSearch = () => {
+    const trimmed = roleSearchText.trim();
+    if (!trimmed) return;
+    if (!availableRoles.some((r) => r.toLowerCase() === trimmed.toLowerCase())) {
+      setCustomRoles((prev) => [...prev, trimmed]);
+    }
+    setFormState((prev) => ({ ...prev, role: trimmed }));
+    setRoleSearchText('');
+    setIsRoleDropdownOpen(false);
+  };
 
   // Pay salary modal state
   const [payingStaff, setPayingStaff] = useState<StaffMember | null>(null);
@@ -180,6 +228,8 @@ export default function StaffView({ onBack }: StaffViewProps) {
     setEditingStaff(null);
     setFormState(createEmptyFormState());
     setFormError(null);
+    setIsRoleDropdownOpen(false);
+    setRoleSearchText('');
     setFormModalVisible(true);
   };
 
@@ -187,6 +237,8 @@ export default function StaffView({ onBack }: StaffViewProps) {
     setEditingStaff(member);
     setFormState(createFormStateFromMember(member));
     setFormError(null);
+    setIsRoleDropdownOpen(false);
+    setRoleSearchText('');
     setFormModalVisible(true);
   };
 
@@ -195,6 +247,8 @@ export default function StaffView({ onBack }: StaffViewProps) {
     setFormModalVisible(false);
     setEditingStaff(null);
     setFormError(null);
+    setIsRoleDropdownOpen(false);
+    setRoleSearchText('');
   };
 
   const handleSaveStaff = async () => {
@@ -218,6 +272,10 @@ export default function StaffView({ onBack }: StaffViewProps) {
     if (numericSalary <= 0) {
       setFormError('Please enter a valid monthly salary greater than zero.');
       return;
+    }
+
+    if (!availableRoles.some((r) => r.toLowerCase() === trimmedRole.toLowerCase())) {
+      setCustomRoles((prev) => [...prev, trimmedRole]);
     }
 
     const trimmedNotes = formState.notes.trim();
@@ -429,27 +487,27 @@ export default function StaffView({ onBack }: StaffViewProps) {
         <View style={styles.contentWrapper}>
           {/* Header */}
           <View style={styles.headerRow}>
-            <View style={styles.headerLeft}>
-              {onBack ? (
-                <TouchableOpacity
-                  onPress={onBack}
-                  style={styles.backButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Back to home"
-                >
-                  <Feather
-                    name="arrow-left"
-                    size={Typography.iconSize.base}
-                    color={Palette.text}
-                  />
-                </TouchableOpacity>
-              ) : null}
-              <View style={styles.headerTitleBlock}>
-                <Text style={styles.pageTitle}>Staff</Text>
-              
-              </View>
-            </View>
+            {onBack ? (
+              <TouchableOpacity
+                style={styles.backButtonCircle}
+                onPress={onBack}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Back to home"
+              >
+                <Feather
+                  name="chevron-left"
+                  size={Typography.iconSize.header}
+                  color={Palette.primary}
+                />
+              </TouchableOpacity>
+            ) : null}
+            <Text style={styles.headerTitle}>Staff</Text>
+          </View>
 
+          {/* Add Staff Action Row - matching Accounts / Reports / Requests */}
+          <View style={styles.addActionRow}>
             <TouchableOpacity
               style={styles.addButton}
               onPress={openAddModal}
@@ -507,35 +565,35 @@ export default function StaffView({ onBack }: StaffViewProps) {
           {/* Summary Cards */}
           <View style={styles.summaryRow}>
             <View style={styles.summaryCard}>
-              <View style={styles.summaryIconWrap}>
-                <Feather
-                  name="users"
-                  size={Typography.iconSize.base}
-                  color={Palette.primary}
-                />
+              <Image
+                source={STAFF_CARD_BG}
+                resizeMode="cover"
+                style={styles.summaryCardBgImage}
+              />
+              <View style={styles.summaryCardContent}>
+                <Text style={styles.summaryLabel}>Active Staff</Text>
+                <Text style={styles.summaryValue}>{stats.activeCount}</Text>
+                <Text style={styles.summaryHint}>
+                  {stats.onLeaveCount > 0
+                    ? `${stats.onLeaveCount} on leave · ${stats.total} total`
+                    : `${stats.total} total team members`}
+                </Text>
               </View>
-              <Text style={styles.summaryLabel}>Active Staff</Text>
-              <Text style={styles.summaryValue}>{stats.activeCount}</Text>
-              <Text style={styles.summaryHint}>
-                {stats.onLeaveCount > 0
-                  ? `${stats.onLeaveCount} on leave · ${stats.total} total`
-                  : `${stats.total} total team members`}
-              </Text>
             </View>
 
             <View style={styles.summaryCard}>
-              <View style={styles.summaryIconWrap}>
-                <Feather
-                  name="credit-card"
-                  size={Typography.iconSize.base}
-                  color={Palette.primary}
-                />
+              <Image
+                source={STAFF_CARD_BG}
+                resizeMode="cover"
+                style={styles.summaryCardBgImage}
+              />
+              <View style={styles.summaryCardContent}>
+                <Text style={styles.summaryLabel}>Monthly Payroll</Text>
+                <Text style={styles.summaryValue}>
+                  {formatRupeeAmount(stats.monthlyPayroll)}
+                </Text>
+                <Text style={styles.summaryHint}>Active monthly commitment</Text>
               </View>
-              <Text style={styles.summaryLabel}>Monthly Payroll</Text>
-              <Text style={styles.summaryValue}>
-                {formatRupeeAmount(stats.monthlyPayroll)}
-              </Text>
-              <Text style={styles.summaryHint}>Active monthly commitment</Text>
             </View>
           </View>
 
@@ -762,10 +820,10 @@ export default function StaffView({ onBack }: StaffViewProps) {
                         style={styles.paySalaryChip}
                         onPress={() => openPayModal(member)}
                       >
-                        <Feather
-                          name="credit-card"
-                          size={Typography.iconSize.sm}
+                        <PaySalaryIcon
+                          size={17}
                           color={Palette.onPrimary}
+                          cutoutColor={Palette.primary}
                         />
                         <Text style={styles.paySalaryChipText}>Pay Salary</Text>
                       </TouchableOpacity>
@@ -863,41 +921,128 @@ export default function StaffView({ onBack }: StaffViewProps) {
               />
 
               <Text style={styles.fieldLabel}>Role *</Text>
-              <View style={styles.chipWrap}>
-                {DEFAULT_STAFF_ROLES.map((roleOption) => {
-                  const active = formState.role === roleOption;
-                  return (
-                    <TouchableOpacity
-                      key={roleOption}
-                      style={[
-                        styles.optionChip,
-                        active && styles.optionChipSelected,
-                      ]}
-                      onPress={() =>
-                        setFormState((prev) => ({ ...prev, role: roleOption }))
-                      }
-                    >
-                      <Text
-                        style={[
-                          styles.optionChipText,
-                          active && styles.optionChipTextSelected,
-                        ]}
-                      >
-                        {roleOption}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <View style={styles.roleInputContainer}>
+                <TextInput
+                  style={styles.roleTextInput}
+                  placeholder="Select or enter role"
+                  placeholderTextColor={Palette.textMuted}
+                  value={formState.role}
+                  onChangeText={(value) => {
+                    setFormState((prev) => ({ ...prev, role: value }));
+                  }}
+                  onFocus={() => setIsRoleDropdownOpen(true)}
+                />
+                <TouchableOpacity
+                  style={styles.dropdownToggleBtn}
+                  onPress={() => setIsRoleDropdownOpen((prev) => !prev)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Toggle role dropdown"
+                >
+                  <Feather
+                    name={isRoleDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                    size={Typography.iconSize.sm}
+                    color={Palette.primary}
+                  />
+                </TouchableOpacity>
               </View>
-              <TextInput
-                style={styles.textInput}
-                placeholder="Or enter a custom role"
-                placeholderTextColor={Palette.textMuted}
-                value={formState.role}
-                onChangeText={(value) =>
-                  setFormState((prev) => ({ ...prev, role: value }))
-                }
-              />
+
+              {isRoleDropdownOpen && (
+                <View style={styles.roleDropdownList}>
+                  {/* 1st Bar: Type / Search Input */}
+                  <View style={styles.roleSearchRow}>
+                    <Feather
+                      name="edit-2"
+                      size={13}
+                      color={Palette.primary}
+                      style={{ marginRight: 8 }}
+                    />
+                    <TextInput
+                      style={styles.roleSearchInput}
+                      placeholder="Type role name..."
+                      placeholderTextColor={Palette.textMuted}
+                      value={roleSearchText}
+                      onChangeText={setRoleSearchText}
+                      returnKeyType="done"
+                      onSubmitEditing={handleAddRoleFromSearch}
+                    />
+                    {canAddTypedRole && (
+                      <TouchableOpacity
+                        style={styles.roleSearchAddBtn}
+                        onPress={handleAddRoleFromSearch}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Add ${trimmedRoleSearch} to dropdown`}
+                      >
+                        <Feather name="plus" size={12} color={Palette.onPrimary} />
+                        <Text style={styles.roleSearchAddBtnText}>Add</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {/* Add to dropdown option row */}
+                  {canAddTypedRole && (
+                    <TouchableOpacity
+                      style={styles.roleDropdownAddItem}
+                      onPress={handleAddRoleFromSearch}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <Feather name="plus-circle" size={15} color={Palette.primary} />
+                        <Text style={styles.roleDropdownAddItemText} numberOfLines={1}>
+                          Add &quot;<Text style={{ fontWeight: '700' }}>{trimmedRoleSearch}</Text>&quot; to dropdown
+                        </Text>
+                      </View>
+                      <Feather name="chevron-right" size={14} color={Palette.primary} />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Scrollable list of existing roles */}
+                  <ScrollView
+                    style={styles.roleDropdownScroll}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator
+                  >
+                    {filteredRoles.map((roleOption, idx) => {
+                      const isSelected =
+                        formState.role.trim().toLowerCase() === roleOption.toLowerCase();
+                      return (
+                        <TouchableOpacity
+                          key={roleOption}
+                          style={[
+                            styles.roleDropdownItem,
+                            idx > 0 && styles.roleDropdownItemBorder,
+                            isSelected && styles.roleDropdownItemActive,
+                          ]}
+                          onPress={() => {
+                            setFormState((prev) => ({ ...prev, role: roleOption }));
+                            setRoleSearchText('');
+                            setIsRoleDropdownOpen(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.roleDropdownItemText,
+                              isSelected && styles.roleDropdownItemTextActive,
+                            ]}
+                          >
+                            {roleOption}
+                          </Text>
+                          {isSelected && (
+                            <Feather name="check" size={14} color={Palette.primary} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {filteredRoles.length === 0 && !canAddTypedRole && (
+                      <View style={styles.roleDropdownEmpty}>
+                        <Text style={styles.roleDropdownEmptyText}>No matching roles</Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+              )}
 
               <Text style={styles.fieldLabel}>Phone Number *</Text>
               <TextInput
@@ -993,7 +1138,7 @@ export default function StaffView({ onBack }: StaffViewProps) {
                 }
               />
 
-              <Text style={styles.fieldLabel}>Notes (optional)</Text>
+              <Text style={styles.fieldLabel}>Notes</Text>
               <TextInput
                 style={[styles.textInput, styles.notesInput]}
                 placeholder="Duty areas, ID verification, emergency info..."
@@ -1027,7 +1172,7 @@ export default function StaffView({ onBack }: StaffViewProps) {
                     ? 'Saving...'
                     : editingStaff
                     ? 'Save Changes'
-                    : 'Add Staff'}
+                    : 'Add'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1222,8 +1367,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingHorizontal: 18,
+    paddingTop: 12,
     paddingBottom: 32,
   },
   contentWrapper: {
@@ -1235,33 +1380,23 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+    marginBottom: -6,
   },
-  headerLeft: {
+  addActionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
+    justifyContent: 'flex-end',
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
-    backgroundColor: Palette.surface,
-    borderWidth: 1,
-    borderColor: Palette.border,
+  backButtonCircle: {
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 8,
+    padding: 4,
   },
-  headerTitleBlock: {
-    flex: 1,
-  },
-  pageTitle: {
-    fontFamily: Typography.fontFamily.serif,
-    fontSize: Typography.fontSize.xl,
-    fontWeight: '700',
+  headerTitle: {
+    fontSize: Typography.fontSize.xxl,
+    fontWeight: '800',
     color: Palette.text,
+    letterSpacing: -0.3,
   },
   pageSubtitle: {
     fontSize: Typography.fontSize.xs,
@@ -1274,7 +1409,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
   },
   addButtonText: {
     color: Palette.onPrimary,
@@ -1287,7 +1422,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     borderWidth: 1,
   },
   noticeBannerSuccess: {
@@ -1318,28 +1453,35 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.md,
-    padding: 14,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    minHeight: 11,
   },
-  summaryIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.sm,
-    backgroundColor: Palette.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
+  summaryCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  summaryCardContent: {
+    paddingVertical: 16,
+    paddingHorizontal: 14,
   },
   summaryLabel: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginBottom: 4,
   },
   summaryValue: {
-    fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: Palette.text,
-    marginTop: 2,
+    letterSpacing: -0.3,
   },
   summaryHint: {
     fontSize: Typography.fontSize.caption,
@@ -1353,7 +1495,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.md,
+    borderRadius: 5,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'web' ? 10 : 8,
   },
@@ -1371,7 +1513,7 @@ const styles = StyleSheet.create({
   filterPill: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -1395,7 +1537,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.md,
+    borderRadius: 5,
     padding: 14,
     gap: 10,
   },
@@ -1450,7 +1592,9 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   statusBadgeActive: {
-    backgroundColor: Palette.status.active.bg,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   statusBadgeLeave: {
     backgroundColor: Palette.status.pending.bg,
@@ -1461,6 +1605,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeTextActive: {
     color: Palette.status.active.text,
+    fontWeight: '700',
   },
   statusBadgeTextLeave: {
     color: Palette.status.pending.text,
@@ -1517,7 +1662,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: Radius.pill,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Palette.border,
     backgroundColor: Palette.background,
@@ -1533,7 +1678,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: Radius.pill,
+    borderRadius: 8,
     backgroundColor: Palette.primary,
   },
   paySalaryChipText: {
@@ -1544,16 +1689,11 @@ const styles = StyleSheet.create({
   iconActionsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 8,
     marginLeft: 'auto',
   },
   iconActionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.sm,
-    backgroundColor: Palette.background,
-    borderWidth: 1,
-    borderColor: Palette.border,
+    padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1561,7 +1701,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.md,
+    borderRadius: 5,
     padding: 24,
     alignItems: 'center',
     gap: 10,
@@ -1629,7 +1769,7 @@ const styles = StyleSheet.create({
     maxWidth: 460,
     maxHeight: '88%',
     backgroundColor: Palette.surface,
-    borderRadius: Radius.md,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: Palette.border,
     overflow: 'hidden',
@@ -1664,7 +1804,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.status.overdue.bg,
     borderWidth: 1,
     borderColor: Palette.status.overdue.bg,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 10,
@@ -1686,11 +1826,119 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.background,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: Typography.fontSize.sm,
     color: Palette.text,
+  },
+  roleInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.background,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+  },
+  roleTextInput: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+  },
+  dropdownToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  roleDropdownList: {
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+    marginTop: 4,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  roleSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: Palette.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+  },
+  roleSearchInput: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+    paddingVertical: 3,
+    paddingHorizontal: 0,
+  },
+  roleSearchAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Palette.primary,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  roleSearchAddBtnText: {
+    fontSize: Typography.fontSize.xs,
+    fontWeight: '700',
+    color: Palette.onPrimary,
+  },
+  roleDropdownAddItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: Palette.iconBg,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+  },
+  roleDropdownAddItemText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.primary,
+    fontWeight: '600',
+  },
+  roleDropdownScroll: {
+    maxHeight: 180,
+  },
+  roleDropdownEmpty: {
+    padding: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleDropdownEmptyText: {
+    fontSize: Typography.fontSize.xs,
+    color: Palette.textMuted,
+  },
+  roleDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  roleDropdownItemBorder: {
+    borderTopWidth: 1,
+    borderTopColor: Palette.border,
+  },
+  roleDropdownItemActive: {
+    backgroundColor: Palette.iconBg,
+  },
+  roleDropdownItemText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+    fontWeight: '500',
+  },
+  roleDropdownItemTextActive: {
+    color: Palette.primary,
+    fontWeight: '700',
   },
   notesInput: {
     minHeight: 72,
@@ -1706,7 +1954,7 @@ const styles = StyleSheet.create({
   optionChip: {
     paddingHorizontal: 11,
     paddingVertical: 6,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     backgroundColor: Palette.background,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -1727,7 +1975,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.tint,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     padding: 12,
     gap: 3,
   },
@@ -1766,7 +2014,7 @@ const styles = StyleSheet.create({
   modalCancelBtn: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: Palette.border,
     backgroundColor: Palette.background,
@@ -1779,13 +2027,13 @@ const styles = StyleSheet.create({
   modalPrimaryBtn: {
     paddingHorizontal: 16,
     paddingVertical: 9,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     backgroundColor: Palette.primary,
   },
   modalDangerBtn: {
     paddingHorizontal: 16,
     paddingVertical: 9,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     backgroundColor: Palette.status.overdue.text,
   },
   modalPrimaryText: {

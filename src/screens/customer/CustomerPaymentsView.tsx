@@ -151,7 +151,7 @@ export default function CustomerPaymentsView({
         <html>
           <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 32px; color: #17121D;">
             <h1 style="color: #4B0082; margin-bottom: 4px;">Luvora Rent Receipt</h1>
-            <p style="color: #68616F; margin-top: 0;">${escapeHtml(profile.propertyName)}</p>
+            <p style="color: #000000; margin-top: 0;">${escapeHtml(profile.propertyName)}</p>
             <hr style="border: none; border-top: 1px solid #E6DFEC; margin: 20px 0;" />
             <p><strong>Receipt ID:</strong> ${escapeHtml(record.id)}</p>
             <p><strong>Resident:</strong> ${escapeHtml(profile.fullName)}</p>
@@ -162,7 +162,7 @@ export default function CustomerPaymentsView({
             <p><strong>Method:</strong> ${escapeHtml(record.method || 'UPI')}</p>
             <p><strong>Status:</strong> ${escapeHtml(record.status)}</p>
             <hr style="border: none; border-top: 1px solid #E6DFEC; margin: 20px 0;" />
-            <p style="color: #68616F; font-size: 12px;">Received by ${escapeHtml(ownerContact.name)} (${escapeHtml(ownerContact.email)})</p>
+            <p style="color: #000000; font-size: 12px;">Received by ${escapeHtml(ownerContact.name)} (${escapeHtml(ownerContact.email)})</p>
           </body>
         </html>
       `;
@@ -215,7 +215,7 @@ export default function CustomerPaymentsView({
               >
                 <Feather
                   name="chevron-left"
-                  size={Typography.iconSize.base}
+                  size={Typography.iconSize.header}
                   color={Palette.primary}
                 />
               </TouchableOpacity>

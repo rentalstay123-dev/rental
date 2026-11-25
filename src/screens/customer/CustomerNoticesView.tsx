@@ -10,7 +10,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useCustomerData } from '../../context/CustomerDataContext';
-import RequestAdminModal from '../../components/RequestAdminModal';
 
 interface CustomerNoticesViewProps {
   initialNoticeId?: string;
@@ -29,8 +28,6 @@ export default function CustomerNoticesView({
   const [filter, setFilter] = useState<NoticeFilter>('All');
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | undefined>(initialNoticeId);
   const [refreshing, setRefreshing] = useState(false);
-  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [bannerText, setBannerText] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialNoticeId) {
@@ -78,32 +75,14 @@ export default function CustomerNoticesView({
                 >
                   <Feather
                     name="chevron-left"
-                    size={Typography.iconSize.base}
+                    size={Typography.iconSize.header}
                     color={Palette.primary}
                   />
                 </TouchableOpacity>
               ) : null}
               <Text style={styles.headerTitle}>Notification</Text>
             </View>
-
-            <TouchableOpacity
-              style={styles.requestButton}
-              onPress={() => setIsRequestModalOpen(true)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.requestButtonText}>Request</Text>
-            </TouchableOpacity>
           </View>
-
-          {bannerText ? (
-            <View style={styles.bannerCard}>
-              <Feather name="check-circle" size={14} color={Palette.status.completed.text} />
-              <Text style={styles.bannerText}>{bannerText}</Text>
-              <TouchableOpacity onPress={() => setBannerText(null)}>
-                <Text style={styles.bannerDismiss}>Dismiss</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
 
           <ScrollView
             horizontal
@@ -157,24 +136,9 @@ export default function CustomerNoticesView({
                   }}
                 >
                   <View style={styles.noticeTopRow}>
-                    <View style={styles.noticeLeftRow}>
-                      <View style={styles.iconCircle}>
-                        <Feather
-                          name={
-                            notice.category === 'Billing'
-                              ? 'credit-card'
-                              : notice.category === 'Maintenance'
-                              ? 'tool'
-                              : 'bell'
-                          }
-                          size={14}
-                          color={Palette.primary}
-                        />
-                      </View>
-                      <Text style={styles.noticeTitle} numberOfLines={1}>
-                        {notice.title}
-                      </Text>
-                    </View>
+                    <Text style={styles.noticeTitle} numberOfLines={1}>
+                      {notice.title}
+                    </Text>
                     <Text style={styles.noticeTag}>{notice.category}</Text>
                   </View>
 
@@ -186,15 +150,6 @@ export default function CustomerNoticesView({
           )}
         </View>
       </ScrollView>
-
-      {/* Quick Request Modal */}
-      <RequestAdminModal
-        visible={isRequestModalOpen}
-        onClose={() => setIsRequestModalOpen(false)}
-        onSuccess={(reqTitle) => {
-          setBannerText(`Request sent to admin: "${reqTitle}"`);
-        }}
-      />
     </View>
   );
 }
@@ -239,42 +194,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
-  },
-  requestButton: {
-    backgroundColor: Palette.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  requestButtonText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '700',
-    color: Palette.onPrimary,
-  },
-  bannerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Palette.status.completed.bg,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: Radius.sm,
-    marginBottom: 16,
-    gap: 8,
-  },
-  bannerText: {
-    flex: 1,
-    fontSize: Typography.fontSize.caption,
-    color: Palette.status.completed.text,
-    fontWeight: '600',
-  },
-  bannerDismiss: {
-    fontSize: Typography.fontSize.caption,
-    color: Palette.primary,
-    fontWeight: '700',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
   },
   filterRow: {
     flexDirection: 'row',
@@ -339,20 +258,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
     gap: 8,
-  },
-  noticeLeftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
   },
   noticeTitle: {
     fontSize: Typography.fontSize.base,

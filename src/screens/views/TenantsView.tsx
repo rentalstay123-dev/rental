@@ -14,7 +14,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Palette, Radius } from '../../constants/theme';
+import { Palette, Radius, Typography } from '../../constants/theme';
 import { useAppData } from '../../context/AppDataContext';
 import { formatShortDate } from '../../utils/finance';
 
@@ -150,7 +150,8 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
           />
         }
       >
-        {/* Header Row */}
+        <View style={styles.contentWrapper}>
+          {/* Header Row */}
         <View style={styles.headerRow}>
           <View style={styles.headerLeft}>
             <TouchableOpacity
@@ -159,7 +160,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
               activeOpacity={0.7}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="chevron-left" size={22} color={Palette.primary} />
+              <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Residents</Text>
           </View>
@@ -270,6 +271,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
             </View>
           );
         })}
+        </View>
       </ScrollView>
 
       {/* Add Resident Modal */}
@@ -365,9 +367,14 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 24,
     backgroundColor: Palette.background,
+  },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 540,
+    alignSelf: 'center',
   },
   headerRow: {
     flexDirection: 'row',
@@ -386,15 +393,10 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: 26,
-    fontWeight: '700',
+    fontSize: Typography.fontSize.xxl,
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.3,
-    ...Platform.select({
-      ios: { fontFamily: 'Georgia' },
-      android: { fontFamily: 'serif' },
-      default: { fontFamily: 'serif' },
-    }),
+    letterSpacing: -0.3,
   },
   addButton: {
     backgroundColor: Palette.primary,

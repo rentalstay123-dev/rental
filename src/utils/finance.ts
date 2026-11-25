@@ -89,7 +89,6 @@ export function deriveRoomRentList(
   rentCycleDay?: string,
   referenceDate: Date = new Date()
 ): ResolvedRoomRent[] {
-  const cycleDayNum = extractCycleDayNumber(rentCycleDay);
   const defaultDue = getDefaultDueDateLabel(referenceDate, rentCycleDay);
 
   return [...rooms]
@@ -108,7 +107,7 @@ export function deriveRoomRentList(
         statusBadgeText = meta.statusBadgeText;
       } else if (room.status === 'Rent due') {
         currentStatus = 'Due';
-        statusBadgeText = `Due ${MONTHS_SHORT[referenceDate.getMonth()]} ${cycleDayNum}`;
+        statusBadgeText = 'Due';
       } else {
         currentStatus = 'Paid';
         statusBadgeText = 'Paid';
@@ -117,7 +116,7 @@ export function deriveRoomRentList(
       // Sync room.status overrides if room was explicitly marked Rent due while meta was unset
       if (room.status === 'Rent due' && currentStatus === 'Paid' && !meta) {
         currentStatus = 'Due';
-        statusBadgeText = `Due ${MONTHS_SHORT[referenceDate.getMonth()]} ${cycleDayNum}`;
+        statusBadgeText = 'Due';
       }
 
       return {

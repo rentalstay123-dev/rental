@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
@@ -24,6 +25,8 @@ import {
   ReportCadence,
   ReportPeriodData,
 } from '../../utils/rentalReportPdf';
+
+const NET_PROFIT_BG = require('../../../assets/net-profit-bg.png');
 
 interface ReportsViewProps {
   onBack?: () => void;
@@ -206,12 +209,12 @@ export default function ReportsView({ onBack, rooms: propRooms }: ReportsViewPro
               accessibilityRole="button"
               accessibilityLabel="Back to Home"
             >
-              <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+              <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Reports</Text>
           </View>
 
-          {/* Top Export Action Row */}
+          {/* Export Action Row - between Reports and Period Pills */}
           <View style={styles.exportActionRow}>
             <TouchableOpacity
               style={styles.exportTopBtn}
@@ -253,27 +256,32 @@ export default function ReportsView({ onBack, rooms: propRooms }: ReportsViewPro
             })}
           </ScrollView>
 
-          {/* Summary Overview Card */}
+          {/* Summary Overview Card (Net Operating Profit) */}
           <View style={styles.mainCard}>
-            <Text style={styles.cardSubtitle}>
-              Net Operating Profit · {activePeriod.fullTitle}
-            </Text>
-            <Text style={styles.profitHighlight}>{activePeriod.netProfit}</Text>
+            <Image
+              source={NET_PROFIT_BG}
+              resizeMode="cover"
+              style={styles.mainCardBgImage}
+            />
+            <View style={styles.mainCardContent}>
+              <Text style={styles.cardSubtitle}>Net Operating Profit</Text>
+              <Text style={styles.profitHighlight}>{activePeriod.netProfit}</Text>
 
-            <View style={styles.statsSplit}>
-              <View style={styles.splitCol}>
-                <Text style={styles.splitLabel}>Total Inflow</Text>
-                <Text style={styles.splitValInflow}>{activePeriod.totalInflow}</Text>
-              </View>
-              <View style={styles.splitDivider} />
-              <View style={styles.splitCol}>
-                <Text style={styles.splitLabel}>Total Outflow</Text>
-                <Text style={styles.splitValOutflow}>{activePeriod.totalOutflow}</Text>
-              </View>
-              <View style={styles.splitDivider} />
-              <View style={styles.splitCol}>
-                <Text style={styles.splitLabel}>Profit Margin</Text>
-                <Text style={styles.splitValMargin}>{activePeriod.profitMargin}</Text>
+              <View style={styles.statsSplit}>
+                <View style={styles.splitCol}>
+                  <Text style={styles.splitLabel}>Total Inflow</Text>
+                  <Text style={styles.splitValInflow}>{activePeriod.totalInflow}</Text>
+                </View>
+                <View style={styles.splitDivider} />
+                <View style={styles.splitCol}>
+                  <Text style={styles.splitLabel}>Total Outflow</Text>
+                  <Text style={styles.splitValOutflow}>{activePeriod.totalOutflow}</Text>
+                </View>
+                <View style={styles.splitDivider} />
+                <View style={styles.splitCol}>
+                  <Text style={styles.splitLabel}>Profit Margin</Text>
+                  <Text style={styles.splitValMargin}>{activePeriod.profitMargin}</Text>
+                </View>
               </View>
             </View>
           </View>
@@ -411,8 +419,8 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 18,
+    paddingTop: 12,
+    paddingBottom: 24,
     backgroundColor: Palette.background,
   },
   contentWrapper: {
@@ -423,7 +431,12 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  exportActionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 12,
   },
   backButtonCircle: {
     alignItems: 'center',
@@ -433,15 +446,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.2,
-    fontFamily: Typography.fontFamily.serif,
-  },
-  exportActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: 12,
+    letterSpacing: -0.3,
   },
   exportTopBtn: {
     flexDirection: 'row',
@@ -483,29 +490,44 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mainCard: {
-    backgroundColor: Palette.surface,
-    borderRadius: 5,
-    padding: 18,
+    backgroundColor: '#E0D2F7',
+    borderRadius: 15,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: Palette.border,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mainCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  mainCardContent: {
+    paddingVertical: 28,
+    paddingHorizontal: 20,
   },
   cardSubtitle: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.base,
     color: Palette.textSecondary,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   profitHighlight: {
-    fontSize: 32,
+    fontSize: Typography.fontSize.xxl,
     fontWeight: '800',
     color: Palette.primary,
-    marginBottom: 16,
+    marginVertical: 6,
+    letterSpacing: -0.4,
   },
   statsSplit: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 14,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Palette.divider,
   },
@@ -515,7 +537,7 @@ const styles = StyleSheet.create({
   splitLabel: {
     fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
-    marginBottom: 4,
+    marginBottom: 3,
   },
   splitValInflow: {
     fontSize: Typography.fontSize.base,

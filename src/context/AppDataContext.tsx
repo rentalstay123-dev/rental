@@ -318,7 +318,7 @@ export function AppDataProvider({ uid, userEmail, userName, children }: AppDataP
             const updatedDueDate = `${nextDay} ${monthMatch[1]} ${monthMatch[2]}`;
             const updatedBadge =
               meta.currentStatus === 'Due'
-                ? `Due ${monthMatch[1]} ${nextDay}`
+                ? 'Due'
                 : meta.statusBadgeText;
             const updatedMeta: RoomRentMeta = {
               ...meta,
@@ -535,7 +535,7 @@ export function AppDataProvider({ uid, userEmail, userName, children }: AppDataP
         dueDate: existingMeta?.dueDate ?? `${cycleDay} ${currMonthShort} ${now.getFullYear()}`,
         paymentCycle: existingMeta?.paymentCycle ?? 'Monthly',
         currentStatus: 'Due',
-        statusBadgeText: `Due ${currMonthShort} ${cycleDay}`,
+        statusBadgeText: 'Due',
         history: existingMeta?.history ?? [],
       };
 

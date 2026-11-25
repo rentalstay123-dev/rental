@@ -58,6 +58,34 @@ function getStatusColors(status: RoomStatus | PaymentStatus) {
   return Palette.status.due;
 }
 
+function getStatusDisplay(room: RoomRentDetail) {
+  if (room.currentStatus === 'Paid') {
+    return {
+      text: 'Paid',
+      color: '#06402B',
+    };
+  }
+  if (room.currentStatus === 'Overdue') {
+    return {
+      text: 'Overdue',
+      color: '#c41e3a',
+    };
+  }
+  if (room.dueDate) {
+    const m = room.dueDate.trim().match(/^(\d+)\s+([A-Za-z]{3})/);
+    if (m) {
+      return {
+        text: `Due ${m[2]} ${m[1]}`,
+        color: '#A0522D',
+      };
+    }
+  }
+  return {
+    text: 'Due',
+    color: '#A0522D',
+  };
+}
+
 function formatAmountDisplay(raw: string): string {
   const digits = raw.replace(/[^0-9]/g, '');
   if (!digits) return '₹0';
@@ -155,37 +183,58 @@ function RoomMetaList({ room, includeTenant = false, showDividers = false }: Roo
   const statusPalette = getStatusColors(room.currentStatus);
   const rows: {
     key: string;
-    icon: keyof typeof Feather.glyphMap;
     label: string;
     value: string;
     valueColor?: string;
   }[] = [
-    ...(includeTenant
-      ? [{ key: 'tenant', icon: 'user' as const, label: 'Tenant', value: room.tenantName }]
-      : []),
-    { key: 'amount', icon: 'calendar', label: 'Rent Amount', value: room.monthlyRent },
-    { key: 'maintenance', icon: 'tool', label: 'Maintenance', value: room.maintenanceAmount },
-    { key: 'advance', icon: 'shield', label: 'Advance Payment', value: room.advancePayment },
-    { key: 'dueDate', icon: 'calendar', label: 'Due Date', value: room.dueDate },
-    { key: 'cycle', icon: 'refresh-cw', label: 'Payment Cycle', value: room.paymentCycle },
-    {
-      key: 'status',
-      icon: 'credit-card',
-      label: 'Status',
-      value: room.currentStatus,
-      valueColor: statusPalette.text,
-    },
-  ];
+      ...(includeTenant
+        ? [
+          {
+            key: 'tenant',
+            label: 'Tenant',
+            value: room.tenantName,
+          },
+        ]
+        : []),
+      {
+        key: 'amount',
+        label: 'Rent Amount',
+        value: room.monthlyRent,
+      },
+      {
+        key: 'maintenance',
+        label: 'Maintenance',
+        value: room.maintenanceAmount,
+      },
+      {
+        key: 'advance',
+        label: 'Advance Payment',
+        value: room.advancePayment,
+      },
+      {
+        key: 'dueDate',
+        label: 'Due Date',
+        value: room.dueDate,
+      },
+      {
+        key: 'cycle',
+        label: 'Payment Cycle',
+        value: room.paymentCycle,
+      },
+      {
+        key: 'status',
+        label: 'Status',
+        value: room.currentStatus,
+        valueColor: statusPalette.text,
+      },
+    ];
 
   return (
     <View style={showDividers ? undefined : styles.expandedDetails}>
       {rows.map((row, index) => (
         <React.Fragment key={row.key}>
           <View style={showDividers ? styles.detailRow : styles.expandedMetaRow}>
-            <View style={styles.detailLabelCol}>
-              <Feather name={row.icon} size={Typography.iconSize.sm} color={Palette.primary} />
-              <Text style={styles.detailLabel}>{row.label}</Text>
-            </View>
+            <Text style={styles.detailLabel}>{row.label}</Text>
             <Text style={[styles.detailValue, row.valueColor ? { color: row.valueColor } : undefined]}>
               {row.value}
             </Text>
@@ -204,7 +253,6 @@ export default function RentView({
   const {
     rentList: rooms,
     recordRentPayment,
-    markRoomRentDue,
     refreshWorkspace,
   } = useAppData();
 
@@ -213,7 +261,7 @@ export default function RentView({
 
   const [filter, setFilter] = useState<RentFilter>(initialFilter);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showCollectDropdown, setShowCollectDropdown] = useState(false);
+  const [showRoomPicker, setShowRoomPicker] = useState(false);
   const [expandedRoomId, setExpandedRoomId] = useState<string | null>(null);
   const [activeScreen, setActiveScreen] = useState<'list' | 'details' | 'record'>('list');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
@@ -243,6 +291,12 @@ export default function RentView({
 
   const selectedRoom = rooms.find((r) => r.id === selectedRoomId) ?? null;
 
+  const totalRoomsCount = rooms.length;
+  const paidRoomsCount = rooms.filter((r) => r.currentStatus === 'Paid').length;
+  const dueRoomsCount = rooms.filter(
+    (r) => r.currentStatus === 'Due' || r.currentStatus === 'Overdue'
+  ).length;
+
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredList = rooms.filter((item) => {
     const matchesFilter =
@@ -262,7 +316,6 @@ export default function RentView({
   });
 
   const handleOpenDetails = (room: RoomRentDetail) => {
-    setShowCollectDropdown(false);
     setSelectedRoomId(room.id);
     setShowAllHistory(false);
     setActiveScreen('details');
@@ -270,7 +323,6 @@ export default function RentView({
 
   const handleOpenRecordPayment = (room: RoomRentDetail) => {
     const currentNow = new Date();
-    setShowCollectDropdown(false);
     setSelectedRoomId(room.id);
     setAmountInput(room.monthlyRent.replace(/^₹\s*/, ''));
     setPaymentDateInput(formatShortDate(currentNow));
@@ -279,9 +331,20 @@ export default function RentView({
     setShowDatePicker(false);
     setPaymentMode('UPI');
     setShowModePicker(false);
+    setShowRoomPicker(false);
     setReferenceInput('');
     setPaymentError(null);
     setActiveScreen('record');
+  };
+
+  const handleOpenCollectScreen = () => {
+    const targetRoom =
+      rooms.find((r) => r.id === selectedRoomId) ||
+      rooms.find((r) => r.currentStatus === 'Overdue' || r.currentStatus === 'Due') ||
+      rooms[0];
+    if (targetRoom) {
+      handleOpenRecordPayment(targetRoom);
+    }
   };
 
   const handlePrevCalendarMonth = () => {
@@ -415,9 +478,9 @@ export default function RentView({
                 accessibilityRole="button"
                 accessibilityLabel="Back to Rent list"
               >
-                <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>{selectedRoom.roomNumber} - Details</Text>
+              <Text style={styles.headerTitle}>{selectedRoom.roomNumber}</Text>
             </View>
 
             {/* Details Summary Card */}
@@ -437,18 +500,7 @@ export default function RentView({
               <RoomMetaList room={selectedRoom} includeTenant showDividers />
             </View>
 
-            <View style={styles.expandedActionsRow}>
-              {selectedRoom.currentStatus === 'Paid' ? (
-                <TouchableOpacity
-                  style={styles.detailsBtn}
-                  activeOpacity={0.75}
-                  onPress={() => void markRoomRentDue(selectedRoom.id)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Mark ${selectedRoom.roomNumber} rent due`}
-                >
-                  <Text style={styles.detailsBtnText}>Mark Rent Due</Text>
-                </TouchableOpacity>
-              ) : null}
+            <View style={styles.detailsActionRow}>
               <TouchableOpacity
                 style={styles.recordBtn}
                 activeOpacity={0.85}
@@ -482,49 +534,46 @@ export default function RentView({
                 </View>
               ) : (
                 visibleHistory.map((record, index) => {
-                const isLast = index === visibleHistory.length - 1;
-                const isPaid = record.status === 'Paid';
-                const isAdvanceRecord = record.title.toLowerCase().includes('advance');
-                return (
-                  <View key={record.id}>
-                    <View style={styles.historyItemRow}>
-                      <View
-                        style={[
-                          styles.historyStatusIcon,
-                          {
-                            backgroundColor: isAdvanceRecord
-                              ? Palette.iconBg
-                              : isPaid
-                                ? Palette.status.paid.text
+                  const isLast = index === visibleHistory.length - 1;
+                  const isPaid = record.status === 'Paid';
+                  const isAdvanceRecord = record.title.toLowerCase().includes('advance');
+                  const isCompleted = isPaid || isAdvanceRecord;
+                  return (
+                    <View key={record.id}>
+                      <View style={styles.historyItemRow}>
+                        <View
+                          style={[
+                            styles.historyStatusIcon,
+                            {
+                              backgroundColor: isCompleted
+                                ? Palette.iconBg
                                 : getStatusColors(record.status).bg,
-                          },
-                        ]}
-                      >
-                        <Feather
-                          name={isAdvanceRecord ? 'shield' : isPaid ? 'check' : 'clock'}
-                          size={Typography.iconSize.sm}
-                          color={
-                            isAdvanceRecord
-                              ? Palette.primary
-                              : isPaid
-                                ? Palette.onPrimary
+                            },
+                          ]}
+                        >
+                          <Feather
+                            name={isCompleted ? 'check' : 'clock'}
+                            size={Typography.iconSize.sm}
+                            color={
+                              isCompleted
+                                ? Palette.status.paid.text
                                 : getStatusColors(record.status).text
-                          }
-                        />
+                            }
+                          />
+                        </View>
+                        <View style={styles.historyTextCol}>
+                          <Text style={styles.historyItemStatus}>{record.title}</Text>
+                          <Text style={styles.historyItemDate}>
+                            {record.date}
+                            {record.method ? ` · ${record.method}` : ''}
+                          </Text>
+                        </View>
+                        <Text style={styles.historyItemAmount}>{record.amount}</Text>
                       </View>
-                      <View style={styles.historyTextCol}>
-                        <Text style={styles.historyItemStatus}>{record.title}</Text>
-                        <Text style={styles.historyItemDate}>
-                          {record.date}
-                          {record.method ? ` · ${record.method}` : ''}
-                        </Text>
-                      </View>
-                      <Text style={styles.historyItemAmount}>{record.amount}</Text>
+                      {!isLast && <View style={styles.rowDivider} />}
                     </View>
-                    {!isLast && <View style={styles.rowDivider} />}
-                  </View>
-                );
-              })
+                  );
+                })
               )}
             </View>
           </View>
@@ -562,17 +611,35 @@ export default function RentView({
                   accessibilityRole="button"
                   accessibilityLabel="Back to Rent list"
                 >
-                  <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                  <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Record Payment</Text>
               </View>
 
               {/* Form Card */}
               <View style={styles.formCard}>
-                {/* Room Header Banner */}
-                <View style={styles.roomBannerForm}>
+                {/* Room Selector with Dropdown */}
+                <TouchableOpacity
+                  style={[styles.roomBannerForm, showRoomPicker && styles.roomBannerFormActive]}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    setShowRoomPicker((prev) => !prev);
+                    setShowDatePicker(false);
+                    setShowModePicker(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Room selector, currently ${selectedRoom.roomNumber}`}
+                  accessibilityState={{ expanded: showRoomPicker }}
+                >
                   <View style={styles.roomBannerInfo}>
-                    <Text style={styles.roomBannerTitle}>{selectedRoom.roomNumber}</Text>
+                    <View style={styles.roomTitleWithDropdownRow}>
+                      <Text style={styles.roomBannerTitle}>{selectedRoom.roomNumber}</Text>
+                      <Feather
+                        name={showRoomPicker ? 'chevron-up' : 'chevron-down'}
+                        size={15}
+                        color={Palette.primary}
+                      />
+                    </View>
                     <Text style={styles.roomBannerSub}>
                       {selectedRoom.tenantName} · {selectedRoom.wing}
                     </Text>
@@ -580,7 +647,74 @@ export default function RentView({
                   <Text style={styles.advancePlainText}>
                     Advance: {selectedRoom.advancePayment}
                   </Text>
-                </View>
+                </TouchableOpacity>
+
+                {/* Room Picker Dropdown List */}
+                {showRoomPicker && (
+                  <View style={styles.roomDropdownCard}>
+                    <ScrollView
+                      style={styles.roomDropdownScroll}
+                      nestedScrollEnabled
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {rooms.map((room, idx) => {
+                        const isSelected = room.id === selectedRoom.id;
+                        const roomStatus = getStatusDisplay(room);
+                        return (
+                          <TouchableOpacity
+                            key={room.id}
+                            style={[
+                              styles.roomDropdownRow,
+                              idx > 0 && styles.modeOptionBorder,
+                              isSelected && styles.roomDropdownRowSelected,
+                            ]}
+                            activeOpacity={0.75}
+                            onPress={() => {
+                              setSelectedRoomId(room.id);
+                              setAmountInput(room.monthlyRent.replace(/^₹\s*/, ''));
+                              setShowRoomPicker(false);
+                              if (paymentError) setPaymentError(null);
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Select ${room.roomNumber}, ${room.tenantName}`}
+                          >
+                            <View style={styles.roomDropdownLeft}>
+                              <Text
+                                style={[
+                                  styles.roomDropdownNumber,
+                                  isSelected && styles.roomDropdownNumberSelected,
+                                ]}
+                              >
+                                {room.roomNumber}
+                              </Text>
+                              <Text style={styles.roomDropdownSub}>
+                                {room.tenantName} · {room.wing}
+                              </Text>
+                            </View>
+                            <View style={styles.roomDropdownRight}>
+                              <Text style={styles.roomDropdownRent}>{room.monthlyRent}</Text>
+                              <Text
+                                style={[
+                                  styles.roomDropdownStatus,
+                                  { color: roomStatus.color },
+                                ]}
+                              >
+                                {roomStatus.text}
+                              </Text>
+                            </View>
+                            {isSelected ? (
+                              <Feather
+                                name="check"
+                                size={Typography.iconSize.sm}
+                                color={Palette.primary}
+                              />
+                            ) : null}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
 
                 {/* Amount Field */}
                 <View style={styles.formGroup}>
@@ -941,7 +1075,7 @@ export default function RentView({
               accessibilityRole="button"
               accessibilityLabel="Back to Home"
             >
-              <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+              <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Rent</Text>
           </View>
@@ -954,7 +1088,6 @@ export default function RentView({
               value={searchQuery}
               onChangeText={(txt) => {
                 setSearchQuery(txt);
-                setShowCollectDropdown(false);
                 setExpandedRoomId(null);
               }}
               placeholder="Search room, tenant, or floor..."
@@ -973,7 +1106,70 @@ export default function RentView({
             ) : null}
           </View>
 
-          {/* Filter Pills + Collect Dropdown Button */}
+          {/* 3 Summary Metric Containers: Total Rooms, Paid, Due */}
+          <View style={styles.summaryRow}>
+            <TouchableOpacity
+              style={[
+                styles.summaryCard,
+                styles.summaryCardTotal,
+                filter === 'All' && styles.summaryCardActiveTotal,
+              ]}
+              activeOpacity={0.75}
+              onPress={() => {
+                setFilter('All');
+                setExpandedRoomId(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Total rooms: ${totalRoomsCount}, filter all`}
+            >
+              <Text style={[styles.summaryValue, styles.summaryValueTotal]}>
+                {totalRoomsCount}
+              </Text>
+              <Text style={styles.summaryLabel}>Total Rooms</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.summaryCard,
+                styles.summaryCardPaid,
+                filter === 'Paid' && styles.summaryCardActivePaid,
+              ]}
+              activeOpacity={0.75}
+              onPress={() => {
+                setFilter('Paid');
+                setExpandedRoomId(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Paid rooms: ${paidRoomsCount}, filter paid`}
+            >
+              <Text style={[styles.summaryValue, styles.summaryValuePaid]}>
+                {paidRoomsCount}
+              </Text>
+              <Text style={styles.summaryLabel}>Paid</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.summaryCard,
+                styles.summaryCardDue,
+                filter === 'Due' && styles.summaryCardActiveDue,
+              ]}
+              activeOpacity={0.75}
+              onPress={() => {
+                setFilter('Due');
+                setExpandedRoomId(null);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Due rooms: ${dueRoomsCount}, filter due`}
+            >
+              <Text style={[styles.summaryValue, styles.summaryValueDue]}>
+                {dueRoomsCount}
+              </Text>
+              <Text style={styles.summaryLabel}>Due</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Filter Pills + Collect Button */}
           <View style={styles.toolbarRow}>
             <View style={styles.filterRow}>
               {(['All', 'Paid', 'Due'] as const).map((tab) => {
@@ -984,7 +1180,6 @@ export default function RentView({
                     style={[styles.filterPill, isActive && styles.filterPillActive]}
                     onPress={() => {
                       setFilter(tab);
-                      setShowCollectDropdown(false);
                       setExpandedRoomId(null);
                     }}
                     activeOpacity={0.75}
@@ -1002,102 +1197,62 @@ export default function RentView({
             <TouchableOpacity
               style={styles.collectBtn}
               activeOpacity={0.85}
-              onPress={() => setShowCollectDropdown((prev) => !prev)}
+              onPress={handleOpenCollectScreen}
               accessibilityRole="button"
-              accessibilityLabel="Collect payment from room list"
-              accessibilityState={{ expanded: showCollectDropdown }}
+              accessibilityLabel="Collect rent payment"
             >
               <Text style={styles.collectBtnText}>Collect</Text>
-              <Feather
-                name={showCollectDropdown ? 'chevron-up' : 'chevron-down'}
-                size={Typography.iconSize.sm}
-                color={Palette.onPrimary}
-              />
             </TouchableOpacity>
           </View>
 
-          {/* Collect Room Picker Dropdown */}
-          {showCollectDropdown && (
-            <View style={styles.collectDropdown}>
-              <ScrollView
-                style={styles.collectDropdownScroll}
-                nestedScrollEnabled
-                keyboardShouldPersistTaps="handled"
-              >
-                {rooms.map((room, idx) => {
-                  const statusPalette = getStatusColors(room.currentStatus);
-                  return (
-                    <TouchableOpacity
-                      key={room.id}
-                      style={[
-                        styles.collectDropdownRow,
-                        idx > 0 && styles.modeOptionBorder,
-                      ]}
-                      activeOpacity={0.75}
-                      onPress={() => handleOpenRecordPayment(room)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Collect rent for ${room.roomNumber}`}
-                    >
-                      <View style={styles.collectDropdownLeft}>
-                        <Text style={styles.collectRoomName}>{room.roomNumber}</Text>
-                        <Text style={styles.collectRoomSub}>
-                          {room.tenantName} · {room.wing}
-                        </Text>
-                      </View>
-                      <View style={styles.collectDropdownRight}>
-                        <Text style={styles.collectRoomAmount}>{room.monthlyRent}</Text>
-                        <Text style={[styles.collectRoomStatus, { color: statusPalette.text }]}>
-                          {room.statusBadgeText}
-                        </Text>
-                      </View>
-                      <Feather
-                        name="chevron-right"
-                        size={Typography.iconSize.sm}
-                        color={Palette.primary}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+          {/* Individual Room Cards List */}
+          {filteredList.length === 0 ? (
+            <View style={styles.emptySearchBox}>
+              <Text style={styles.emptySearchText}>No rooms match your search.</Text>
             </View>
-          )}
-
-          {/* Expandable Room List Card */}
-          <View style={styles.ledgerCard}>
-            {filteredList.length === 0 ? (
-              <View style={styles.emptySearchBox}>
-                <Text style={styles.emptySearchText}>No rooms match your search.</Text>
-              </View>
-            ) : (
-              filteredList.map((room, index) => {
-              const isLast = index === filteredList.length - 1;
+          ) : (
+            filteredList.map((room) => {
               const isExpanded = room.id === expandedRoomId;
-              const statusPalette = getStatusColors(room.currentStatus);
+              const statusInfo = getStatusDisplay(room);
 
               return (
-                <View key={room.id}>
-                  {isExpanded ? (
-                    <View style={styles.expandedRoomBox}>
-                      {/* Expanded Header (Tap to collapse) */}
-                      <TouchableOpacity
-                        style={styles.expandedHeader}
-                        activeOpacity={0.75}
-                        onPress={() => setExpandedRoomId(null)}
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: true }}
-                      >
-                        <View style={styles.roomBannerInfo}>
-                          <Text style={styles.roomHeadingText}>{room.roomNumber}</Text>
-                          <Text style={styles.tenantRoomText}>
-                            {room.tenantName} · {room.wing}
-                          </Text>
-                        </View>
-                        <Text style={[styles.statusPillText, { color: statusPalette.text }]}>
-                          {room.currentStatus}
-                        </Text>
-                      </TouchableOpacity>
+                <View key={room.id} style={styles.roomCard}>
+                  {/* Card Main Row (Always visible) */}
+                  <TouchableOpacity
+                    style={styles.roomCardMainRow}
+                    activeOpacity={0.7}
+                    onPress={() => setExpandedRoomId(isExpanded ? null : room.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: isExpanded }}
+                    accessibilityLabel={`${room.roomNumber}, ${room.tenantName}, ${room.monthlyRent}, ${statusInfo.text}`}
+                  >
+                    {/* Left purple indicator bar */}
+                    <View style={styles.roomAccentBar} />
 
-                      <View style={styles.rowDivider} />
+                    {/* Room title & tenant info */}
+                    <View style={styles.roomCardInfo}>
+                      <Text style={styles.roomCardTitle}>{room.roomNumber}</Text>
+                      <Text style={styles.roomCardSub} numberOfLines={1}>
+                        {room.tenantName} · {room.wing}
+                      </Text>
+                    </View>
+
+                    {/* Vertical Divider */}
+                    <View style={styles.roomCardDivider} />
+
+                    {/* Rent Amount & Status */}
+                    <View style={styles.roomCardRight}>
+                      <Text style={styles.roomCardAmount}>{room.monthlyRent}</Text>
+                      <Text style={[styles.roomCardStatusText, { color: statusInfo.color }]}>
+                        {statusInfo.text}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Expanded Room Details & Actions */}
+                  {isExpanded && (
+                    <View style={styles.expandedContent}>
+                      <View style={styles.expandedDivider} />
 
                       {/* Key-Value Rows */}
                       <RoomMetaList room={room} />
@@ -1125,36 +1280,11 @@ export default function RentView({
                         </TouchableOpacity>
                       </View>
                     </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.ledgerRow}
-                      activeOpacity={0.7}
-                      onPress={() => setExpandedRoomId(room.id)}
-                      accessibilityRole="button"
-                      accessibilityState={{ expanded: false }}
-                    >
-                      <View style={styles.tenantInfoCol}>
-                        <Text style={styles.roomHeadingText}>{room.roomNumber}</Text>
-                        <Text style={styles.tenantRoomText}>
-                          {room.tenantName} · {room.wing}
-                        </Text>
-                      </View>
-
-                      <View style={styles.amountBadgeCol}>
-                        <Text style={styles.amountText}>{room.monthlyRent}</Text>
-                        <Text style={[styles.statusBadgeText, { color: statusPalette.text }]}>
-                          {room.statusBadgeText}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
                   )}
-
-                  {!isLast && <View style={styles.divider} />}
                 </View>
               );
             })
-            )}
-          </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -1173,7 +1303,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 24,
     backgroundColor: Palette.background,
   },
@@ -1195,27 +1325,87 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.2,
-    fontFamily: Typography.fontFamily.serif,
+    letterSpacing: -0.3,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 14,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 5,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryCardTotal: {
+    backgroundColor: '#F3ECFB',
+    borderColor: '#E3D5F8',
+  },
+  summaryCardActiveTotal: {
+    borderColor: '#4B0082',
+    borderWidth: 1.5,
+  },
+  summaryCardPaid: {
+    backgroundColor: '#F3ECFB',
+    borderColor: '#E3D5F8',
+  },
+  summaryCardActivePaid: {
+    borderColor: '#4B0082',
+    borderWidth: 1.5,
+  },
+  summaryCardDue: {
+    backgroundColor: '#F3ECFB',
+    borderColor: '#E3D5F8',
+  },
+  summaryCardActiveDue: {
+    borderColor: '#4B0082',
+    borderWidth: 1.5,
+  },
+  summaryValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    lineHeight: 26,
+    textAlign: 'center',
+  },
+  summaryValueTotal: {
+    color: '#4B0082',
+  },
+  summaryValuePaid: {
+    color: '#4B0082',
+  },
+  summaryValueDue: {
+    color: '#4B0082',
+  },
+  summaryLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Palette.text,
+    marginTop: 3,
+    textAlign: 'center',
   },
   toolbarRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
     gap: 8,
   },
   filterRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   filterPill: {
     backgroundColor: Palette.surface,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderWidth: 1,
     borderColor: Palette.border,
   },
@@ -1226,28 +1416,35 @@ const styles = StyleSheet.create({
   filterPillText: {
     fontSize: Typography.fontSize.sm,
     fontWeight: '600',
-    color: Palette.textSecondary,
+    color: Palette.text,
   },
   filterPillTextActive: {
     color: Palette.onPrimary,
     fontWeight: '700',
   },
   collectBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
     backgroundColor: Palette.primary,
     borderRadius: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
   },
   collectBtnText: {
     color: Palette.onPrimary,
     fontSize: Typography.fontSize.sm,
     fontWeight: '700',
   },
-  collectDropdown: {
-    marginTop: -6,
+  roomTitleWithDropdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  roomBannerFormActive: {
+    borderColor: Palette.primary,
+  },
+  roomDropdownCard: {
+    marginTop: -10,
     marginBottom: 16,
     backgroundColor: Palette.surface,
     borderWidth: 1,
@@ -1255,104 +1452,120 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     overflow: 'hidden',
   },
-  collectDropdownScroll: {
-    maxHeight: 230,
+  roomDropdownScroll: {
+    maxHeight: 220,
   },
-  collectDropdownRow: {
+  roomDropdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 11,
-    gap: 10,
+    paddingVertical: 10,
+    gap: 8,
   },
-  collectDropdownLeft: {
+  roomDropdownRowSelected: {
+    backgroundColor: '#F3ECFB',
+  },
+  roomDropdownLeft: {
     flex: 1,
   },
-  collectRoomName: {
+  roomDropdownNumber: {
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
     color: Palette.text,
   },
-  collectRoomSub: {
-    fontSize: Typography.fontSize.caption,
+  roomDropdownNumberSelected: {
+    color: Palette.primary,
+  },
+  roomDropdownSub: {
+    fontSize: 11,
     color: Palette.textSecondary,
     marginTop: 2,
   },
-  collectDropdownRight: {
+  roomDropdownRight: {
     alignItems: 'flex-end',
+    marginRight: 4,
   },
-  collectRoomAmount: {
+  roomDropdownRent: {
     fontSize: Typography.fontSize.sm,
     fontWeight: '700',
     color: Palette.text,
   },
-  collectRoomStatus: {
-    fontSize: Typography.fontSize.caption,
+  roomDropdownStatus: {
+    fontSize: 11,
     fontWeight: '700',
     marginTop: 2,
   },
-  ledgerCard: {
+  roomCard: {
     backgroundColor: Palette.surface,
     borderRadius: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
     borderWidth: 1,
     borderColor: Palette.border,
+    marginBottom: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
-  ledgerRow: {
+  roomCardMainRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 4,
   },
-  tenantInfoCol: {
+  roomAccentBar: {
+    width: 4,
+    height: 28,
+    borderRadius: 2,
+    backgroundColor: Palette.primary,
+    marginRight: 10,
+  },
+  roomCardInfo: {
     flex: 1,
-    marginRight: 12,
+    justifyContent: 'center',
   },
-  roomHeadingText: {
-    fontSize: Typography.fontSize.md,
-    fontWeight: '700',
-    color: Palette.text,
-    marginBottom: 3,
-  },
-  tenantRoomText: {
-    fontSize: Typography.fontSize.sm,
-    color: Palette.textSecondary,
-  },
-  amountBadgeCol: {
-    alignItems: 'flex-end',
-  },
-  amountText: {
+  roomCardTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
     color: Palette.text,
-    marginBottom: 4,
+    lineHeight: 18,
   },
-  statusBadgeText: {
-    fontSize: Typography.fontSize.caption,
+  roomCardSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Palette.textSecondary,
+    lineHeight: 14,
+    marginTop: 2,
+  },
+  roomCardDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Palette.border,
+    marginHorizontal: 12,
+  },
+  roomCardRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    minWidth: 70,
+  },
+  roomCardAmount: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    color: Palette.text,
+    lineHeight: 18,
+  },
+  roomCardStatusText: {
+    fontSize: 11,
     fontWeight: '700',
+    lineHeight: 14,
+    marginTop: 2,
   },
-  divider: {
+  expandedContent: {
+    marginTop: 10,
+  },
+  expandedDivider: {
     height: 1,
-    backgroundColor: Palette.divider,
+    backgroundColor: Palette.border,
+    marginBottom: 8,
   },
   rowDivider: {
     height: 1,
     backgroundColor: Palette.divider,
-  },
-  expandedRoomBox: {
-    backgroundColor: Palette.tint,
-    borderRadius: 5,
-    padding: 14,
-    marginVertical: 8,
-    borderWidth: 1,
-    borderColor: Palette.border,
-  },
-  expandedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingBottom: 12,
   },
   roomBannerInfo: {
     flex: 1,
@@ -1381,18 +1594,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  detailLabelCol: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
   detailLabel: {
     fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '500',
   },
   detailValue: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.sm,
     color: Palette.text,
     fontWeight: '700',
   },
@@ -1439,7 +1647,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.border,
     padding: 16,
-    marginBottom: 22,
+    marginBottom: 12,
+  },
+  detailsActionRow: {
+    flexDirection: 'row',
+    marginBottom: 18,
   },
   roomBanner: {
     flexDirection: 'row',
@@ -1465,14 +1677,16 @@ const styles = StyleSheet.create({
   },
   historySectionTitle: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
+    letterSpacing: -0.2,
   },
   viewAllLink: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: Typography.fontSize.viewAll,
     fontWeight: '700',
-    color: Palette.accentText,
+    color: Palette.primary,
     textDecorationLine: 'underline',
+    textDecorationColor: Palette.primary,
   },
   historyListCard: {
     backgroundColor: Palette.surface,
@@ -1488,9 +1702,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   historyStatusIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: Radius.pill,
+    width: 34,
+    height: 34,
+    borderRadius: 5,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1525,7 +1740,7 @@ const styles = StyleSheet.create({
   roomBannerForm: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Palette.tint,
+    backgroundColor: Palette.surface,
     borderRadius: 5,
     borderWidth: 1,
     borderColor: Palette.border,

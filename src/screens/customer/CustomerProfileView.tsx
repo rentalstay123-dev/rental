@@ -252,7 +252,7 @@ export default function CustomerProfileView({
               >
                 <Feather
                   name="chevron-left"
-                  size={Typography.iconSize.base}
+                  size={Typography.iconSize.header}
                   color={Palette.primary}
                 />
               </TouchableOpacity>

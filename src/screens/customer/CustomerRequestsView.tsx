@@ -30,7 +30,16 @@ interface CustomerRequestsViewProps {
 
 type RequestFilter = 'All' | ServiceRequestStatus;
 
-const CATEGORIES = [...INITIAL_MAINTENANCE_REASONS, 'Other'];
+const CATEGORIES = Array.from(
+  new Set([
+    ...INITIAL_MAINTENANCE_REASONS,
+    'Carpentry',
+    'Cleaning',
+    'Appliance',
+    'General',
+    'Other',
+  ])
+);
 
 function getStatusStyle(status: ServiceRequestStatus) {
   if (status === 'Resolved') return Palette.status.paid;
@@ -52,7 +61,8 @@ export default function CustomerRequestsView({
     deleteServiceRequest,
     refreshWorkspace,
   } = useCustomerData();
-  const { requests, room } = data;
+  const { requests, room, profile } = data;
+  const fixedRoomNumber = profile.roomNumber?.trim() || room.roomNumber || 'Room 102';
 
   const [filter, setFilter] = useState<RequestFilter>('All');
   const [refreshing, setRefreshing] = useState(false);
@@ -61,6 +71,7 @@ export default function CustomerRequestsView({
   // Create Modal
   const [isNewModalOpen, setIsNewModalOpen] = useState(() => Boolean(initialOpenNewModal));
   const [category, setCategory] = useState(CATEGORIES[0] || 'Plumbing');
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [priority, setPriority] = useState<ServiceRequestPriority>('Normal');
   const [titleInput, setTitleInput] = useState('');
   const [descInput, setDescInput] = useState('');
@@ -72,6 +83,7 @@ export default function CustomerRequestsView({
 
   const openNewModal = React.useCallback(() => {
     setCategory(CATEGORIES[0] || 'Plumbing');
+    setIsCategoryDropdownOpen(false);
     setPriority('Normal');
     setTitleInput('');
     setDescInput('');
@@ -101,9 +113,10 @@ export default function CustomerRequestsView({
         title: titleInput,
         description: descInput,
         priority,
+        roomNumber: fixedRoomNumber,
       });
       setIsNewModalOpen(false);
-      setBannerText('Service request submitted to the property manager.');
+      setBannerText(`Service request submitted for ${fixedRoomNumber}.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -141,7 +154,7 @@ export default function CustomerRequestsView({
                 >
                   <Feather
                     name="chevron-left"
-                    size={Typography.iconSize.base}
+                    size={Typography.iconSize.header}
                     color={Palette.primary}
                   />
                 </TouchableOpacity>
@@ -154,7 +167,6 @@ export default function CustomerRequestsView({
               onPress={openNewModal}
               activeOpacity={0.85}
             >
-              <Feather name="plus" size={16} color={Palette.onPrimary} />
               <Text style={styles.addBtnText}>New</Text>
             </TouchableOpacity>
           </View>
@@ -199,14 +211,12 @@ export default function CustomerRequestsView({
           {/* Request List */}
           {filteredRequests.length === 0 ? (
             <View style={styles.emptyCard}>
-              <View style={styles.emptyIconCircle}>
-                <Feather name="tool" size={24} color={Palette.primary} />
-              </View>
               <Text style={styles.emptyTitle}>No {filter === 'All' ? '' : `${filter} `}requests</Text>
             </View>
           ) : (
             filteredRequests.map((req) => {
               const stColors = getStatusStyle(req.status);
+              const isResolved = req.status === 'Resolved';
               return (
                 <TouchableOpacity
                   key={req.id}
@@ -216,9 +226,6 @@ export default function CustomerRequestsView({
                 >
                   <View style={styles.reqTopRow}>
                     <View style={styles.reqCategoryRow}>
-                      <View style={styles.reqIconBox}>
-                        <Feather name="tool" size={14} color={Palette.primary} />
-                      </View>
                       <Text style={styles.reqCategoryText}>{req.category}</Text>
                       {req.priority === 'Urgent' ? (
                         <View style={styles.urgentBadge}>
@@ -226,8 +233,21 @@ export default function CustomerRequestsView({
                         </View>
                       ) : null}
                     </View>
-                    <View style={[styles.statusBadge, { backgroundColor: stColors.bg }]}>
-                      <Text style={[styles.statusBadgeText, { color: stColors.text }]}>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        isResolved
+                          ? styles.statusBadgePlain
+                          : { backgroundColor: stColors.bg },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusBadgeText,
+                          { color: stColors.text },
+                          isResolved && styles.statusBadgeTextPlain,
+                        ]}
+                      >
                         {req.status}
                       </Text>
                     </View>
@@ -238,24 +258,12 @@ export default function CustomerRequestsView({
                     {req.description}
                   </Text>
 
-                  {req.ownerNote || req.assignedTo ? (
-                    <View style={styles.noteBox}>
-                      {req.assignedTo ? (
-                        <Text style={styles.noteAssigned}>Assigned: {req.assignedTo}</Text>
-                      ) : null}
-                      {req.ownerNote ? (
-                        <Text style={styles.noteText} numberOfLines={2}>
-                          {req.ownerNote}
-                        </Text>
-                      ) : null}
-                    </View>
-                  ) : null}
-
                   <View style={styles.reqFooterRow}>
-                    <Text style={styles.reqTime}>{req.timeLabel}</Text>
+                    <Text style={styles.reqTime}>
+                      {req.roomNumber || fixedRoomNumber} · {req.timeLabel}
+                    </Text>
                     <View style={styles.viewDetailRow}>
                       <Text style={styles.viewDetailText}>Details</Text>
-                      <Feather name="chevron-right" size={14} color={Palette.primary} />
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -306,27 +314,61 @@ export default function CustomerRequestsView({
                 </View>
               ) : null}
 
+              {/* Category Dropdown */}
               <Text style={styles.inputLabel}>Category</Text>
-              <View style={styles.chipWrap}>
-                {CATEGORIES.map((cat) => {
-                  const active = category === cat;
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[styles.selectChip, active && styles.selectChipActive]}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
-                        style={[
-                          styles.selectChipText,
-                          active && styles.selectChipTextActive,
-                        ]}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <TouchableOpacity
+                style={styles.dropdownSelector}
+                onPress={() => setIsCategoryDropdownOpen((prev) => !prev)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.dropdownSelectorText}>{category}</Text>
+                <Feather
+                  name={isCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                  size={Typography.iconSize.base}
+                  color={Palette.primary}
+                />
+              </TouchableOpacity>
+
+              {isCategoryDropdownOpen && (
+                <View style={styles.dropdownMenu}>
+                  <ScrollView
+                    style={styles.dropdownScroll}
+                    nestedScrollEnabled
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    {CATEGORIES.map((cat) => {
+                      const isSelected = category === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                          onPress={() => {
+                            setCategory(cat);
+                            setIsCategoryDropdownOpen(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              isSelected && styles.dropdownItemTextSelected,
+                            ]}
+                          >
+                            {cat}
+                          </Text>
+                          {isSelected && (
+                            <Feather name="check" size={Typography.iconSize.sm} color={Palette.primary} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Room Number (Fixed based on customer profile) */}
+              <Text style={styles.inputLabel}>Room Number</Text>
+              <View style={styles.fixedInput}>
+                <Text style={styles.fixedInputText}>{fixedRoomNumber}</Text>
               </View>
 
               <Text style={styles.inputLabel}>Priority</Text>
@@ -389,7 +431,7 @@ export default function CustomerRequestsView({
                 activeOpacity={0.85}
               >
                 <Text style={styles.modalPrimaryBtnText}>
-                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -423,7 +465,7 @@ export default function CustomerRequestsView({
 
               <Text style={styles.detailTitle}>{selectedRequest.title}</Text>
               <Text style={styles.detailMeta}>
-                {room.roomNumber} · {selectedRequest.priority} priority · {selectedRequest.timeLabel}
+                {selectedRequest.roomNumber || fixedRoomNumber} · {selectedRequest.status} · {selectedRequest.priority} priority · {selectedRequest.timeLabel}
               </Text>
               <Text style={styles.detailBody}>{selectedRequest.description}</Text>
 
@@ -517,13 +559,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
     backgroundColor: Palette.primary,
     borderRadius: Radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addBtnText: {
     color: Palette.onPrimary,
@@ -657,8 +698,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
+  statusBadgePlain: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
   statusBadgeText: {
     fontSize: 11,
+    fontWeight: '700',
+  },
+  statusBadgeTextPlain: {
+    fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
   reqTitle: {
@@ -775,31 +825,69 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
     marginBottom: 6,
   },
-  chipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 7,
-    marginBottom: 14,
-  },
-  selectChip: {
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: Radius.pill,
+  dropdownSelector: {
+    backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    backgroundColor: Palette.surface,
+    borderRadius: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  selectChipActive: {
-    backgroundColor: Palette.primary,
-    borderColor: Palette.primary,
-  },
-  selectChipText: {
-    fontSize: Typography.fontSize.xs,
-    fontWeight: '600',
+  dropdownSelectorText: {
+    fontSize: Typography.fontSize.sm,
     color: Palette.text,
+    fontWeight: '600',
   },
-  selectChipTextActive: {
-    color: Palette.onPrimary,
+  dropdownMenu: {
+    marginTop: -6,
+    marginBottom: 12,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  dropdownScroll: {
+    maxHeight: 160,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Palette.border,
+  },
+  dropdownItemSelected: {
+    backgroundColor: Palette.tint,
+  },
+  dropdownItemText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+    fontWeight: '500',
+  },
+  dropdownItemTextSelected: {
+    color: Palette.primary,
+    fontWeight: '700',
+  },
+  fixedInput: {
+    backgroundColor: Palette.tint,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    marginBottom: 12,
+  },
+  fixedInputText: {
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+    fontWeight: '600',
   },
   priorityRow: {
     flexDirection: 'row',

@@ -11,6 +11,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
@@ -24,6 +25,8 @@ import type {
 } from '../../types/appData';
 import { formatShortDate } from '../../utils/finance';
 import { sortRoomNumbers } from './RoomsView';
+
+const DEPOSITS_CARD_BG = require('../../../assets/accounts-card-bg.jpg');
 
 interface DepositsViewProps {
   onBack?: () => void;
@@ -327,7 +330,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
     <Modal
       visible={actionModalMode !== null && selectedDeposit !== null}
       transparent
-      animationType="slide"
+      animationType="fade"
       onRequestClose={closeActionModal}
     >
       <KeyboardAvoidingView
@@ -511,17 +514,15 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
 
     const detailRows: {
       key: string;
-      icon: keyof typeof Feather.glyphMap;
       label: string;
       value: string;
       valueColor?: string;
     }[] = [
-      { key: 'resident', icon: 'user', label: 'Resident', value: selectedDeposit.residentName },
-      { key: 'wing', icon: 'map-pin', label: 'Location', value: selectedDeposit.room.wing },
-      { key: 'type', icon: 'home', label: 'Room Type', value: selectedDeposit.room.type },
+      { key: 'resident', label: 'Resident', value: selectedDeposit.residentName },
+      { key: 'wing', label: 'Location', value: selectedDeposit.room.wing },
+      { key: 'type', label: 'Room Type', value: selectedDeposit.room.type },
       {
         key: 'amount',
-        icon: 'lock',
         label: isHeld ? 'Deposit Held' : isRefunded ? 'Refunded Amount' : 'Standard Deposit',
         value: isHeld || isRefunded ? selectedDeposit.amount : selectedDeposit.standardDeposit,
       },
@@ -529,28 +530,25 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
         ? [
             {
               key: 'deducted',
-              icon: 'minus-circle' as const,
               label: 'Total Deducted',
               value: selectedDeposit.deductedAmount,
               valueColor: Palette.status.overdue.text,
             },
           ]
         : []),
-      { key: 'date', icon: 'calendar', label: 'Received Date', value: selectedDeposit.dateReceived },
+      { key: 'date', label: 'Received Date', value: selectedDeposit.dateReceived },
       ...(isRefunded && selectedDeposit.dateRefunded
         ? [
             {
               key: 'refundedDate',
-              icon: 'calendar' as const,
               label: 'Refunded Date',
               value: selectedDeposit.dateRefunded,
             },
           ]
         : []),
-      { key: 'mode', icon: 'credit-card', label: 'Payment Mode', value: selectedDeposit.paymentMode },
+      { key: 'mode', label: 'Payment Mode', value: selectedDeposit.paymentMode },
       {
         key: 'status',
-        icon: 'check-circle',
         label: 'Status',
         value: selectedDeposit.status,
         valueColor: statusColor,
@@ -581,7 +579,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
                   accessibilityRole="button"
                   accessibilityLabel="Back to Deposit room list"
                 >
-                  <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                  <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>{selectedDeposit.room.roomNumber} - Deposit</Text>
               </View>
@@ -613,10 +611,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
               {detailRows.map((row, idx) => (
                 <React.Fragment key={row.key}>
                   <View style={styles.detailRow}>
-                    <View style={styles.detailLabelCol}>
-                      <Feather name={row.icon} size={Typography.iconSize.sm} color={Palette.primary} />
-                      <Text style={styles.detailLabel}>{row.label}</Text>
-                    </View>
+                    <Text style={styles.detailLabel}>{row.label}</Text>
                     <Text
                       style={[
                         styles.detailValue,
@@ -681,9 +676,9 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
                       <View style={styles.historyRow}>
                         <View style={styles.historyIconBox}>
                           <Feather
-                            name={isDeduction ? 'minus-circle' : isRefundEntry ? 'rotate-ccw' : 'lock'}
+                            name={isDeduction ? 'minus-circle' : isRefundEntry ? 'rotate-ccw' : 'check'}
                             size={Typography.iconSize.sm}
-                            color={isDeduction ? Palette.status.overdue.text : Palette.primary}
+                            color={isDeduction ? Palette.status.overdue.text : isRefundEntry ? Palette.primary : Palette.status.paid.text}
                           />
                         </View>
                         <View style={styles.historyTextCol}>
@@ -745,7 +740,7 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
                 accessibilityRole="button"
                 accessibilityLabel="Back to Home"
               >
-                <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Deposits</Text>
             </View>
@@ -753,23 +748,41 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
 
           {/* Summary Metrics Row */}
           <View style={styles.metricsRow}>
+            {/* Total Held Card */}
             <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Total Held</Text>
-              <Text style={styles.metricValue}>{formatRupeeAmount(totalHeldAmount)}</Text>
-              <Text style={styles.metricSub}>
-                {heldRooms.length} room {heldRooms.length === 1 ? 'deposit' : 'deposits'}
-              </Text>
+              <Image
+                source={DEPOSITS_CARD_BG}
+                resizeMode="cover"
+                style={styles.metricCardBgImage}
+              />
+              <View style={styles.metricCardContent}>
+                <Text style={styles.metricLabel}>Total Held</Text>
+                <Text style={styles.metricValue}>{formatRupeeAmount(totalHeldAmount)}</Text>
+                <Text style={styles.metricSub}>
+                  {heldRooms.length} room {heldRooms.length === 1 ? 'deposit' : 'deposits'}
+                </Text>
+                <View style={styles.metricIndicator} />
+              </View>
             </View>
 
+            {/* Total Refunded Card */}
             <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Total Refunded</Text>
-              <Text style={[styles.metricValue, { color: Palette.primary }]}>
-                {formatRupeeAmount(totalRefundedAmount)}
-              </Text>
-              <Text style={styles.metricSub}>
-                {refundedRooms.length}{' '}
-                {refundedRooms.length === 1 ? 'room refunded' : 'rooms refunded'}
-              </Text>
+              <Image
+                source={DEPOSITS_CARD_BG}
+                resizeMode="cover"
+                style={styles.metricCardBgImage}
+              />
+              <View style={styles.metricCardContent}>
+                <Text style={styles.metricLabel}>Total Refunded</Text>
+                <Text style={[styles.metricValue, { color: Palette.text }]}>
+                  {formatRupeeAmount(totalRefundedAmount)}
+                </Text>
+                <Text style={styles.metricSub}>
+                  {refundedRooms.length}{' '}
+                  {refundedRooms.length === 1 ? 'room refunded' : 'rooms refunded'}
+                </Text>
+                <View style={[styles.metricIndicator, { backgroundColor: Palette.primary }]} />
+              </View>
             </View>
           </View>
 
@@ -815,57 +828,53 @@ export default function DepositsView({ onBack, rooms: propRooms }: DepositsViewP
             })}
           </View>
 
-          {/* Room List Card */}
-          <View style={styles.listCard}>
-            {filteredRooms.length === 0 ? (
-              <View style={styles.emptySearchBox}>
-                <Text style={styles.emptySearchText}>No rooms match your filter.</Text>
-              </View>
-            ) : (
-              filteredRooms.map((item, index) => {
-                const statusColor = getDepositStatusColor(item.status);
-                const subtitle =
-                  item.status === 'No Deposit'
-                    ? `Vacant · ${item.room.type} · ${item.room.wing}`
-                    : `${item.residentName} · ${item.room.wing}`;
+          {/* Room List: Separate Bar / Card for each room */}
+          {filteredRooms.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptySearchText}>No rooms match your filter.</Text>
+            </View>
+          ) : (
+            filteredRooms.map((item) => {
+              const statusColor = getDepositStatusColor(item.status);
+              const subtitle =
+                item.status === 'No Deposit'
+                  ? `Vacant · ${item.room.type} · ${item.room.wing}`
+                  : `${item.residentName} · ${item.room.wing}`;
 
-                return (
-                  <React.Fragment key={item.room.id}>
-                    {index > 0 && <View style={styles.divider} />}
-                    <TouchableOpacity
-                      style={styles.depositRow}
-                      activeOpacity={0.7}
-                      onPress={() => {
-                        setNoticeText(null);
-                        setSelectedRoomNumber(item.room.roomNumber);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Open deposit details for ${item.room.roomNumber}`}
-                    >
-                      <View style={styles.rowLeft}>
-                        <Text style={styles.residentName}>{item.room.roomNumber}</Text>
-                        <Text style={styles.roomSubtitle}>{subtitle}</Text>
-                      </View>
+              return (
+                <TouchableOpacity
+                  key={item.room.id}
+                  style={styles.depositCard}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setNoticeText(null);
+                    setSelectedRoomNumber(item.room.roomNumber);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Open deposit details for ${item.room.roomNumber}`}
+                >
+                  <View style={styles.rowLeft}>
+                    <Text style={styles.residentName}>{item.room.roomNumber}</Text>
+                    <Text style={styles.roomSubtitle}>{subtitle}</Text>
+                  </View>
 
-                      <View style={styles.rowRightAction}>
-                        <View style={styles.rowRight}>
-                          <Text style={styles.depositAmount}>{item.amount}</Text>
-                          <Text style={[styles.badgeText, { color: statusColor }]}>
-                            {item.status}
-                          </Text>
-                        </View>
-                        <Feather
-                          name="chevron-right"
-                          size={Typography.iconSize.sm}
-                          color={Palette.primary}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                  </React.Fragment>
-                );
-              })
-            )}
-          </View>
+                  <View style={styles.rowRightAction}>
+                    <View style={styles.rowRight}>
+                      <Text style={styles.depositAmount}>{item.amount}</Text>
+                      <Text style={[styles.badgeText, { color: statusColor }]}>
+                        {item.status}
+                      </Text>
+                    </View>
+                    <Feather
+                      name="chevron-right"
+                      size={Typography.iconSize.sm}
+                      color={Palette.primary}
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
         </View>
       </ScrollView>
     </View>
@@ -880,7 +889,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 24,
     backgroundColor: Palette.background,
   },
@@ -898,7 +907,6 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   backButtonCircle: {
     alignItems: 'center',
@@ -908,10 +916,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.2,
-    fontFamily: Typography.fontFamily.serif,
+    letterSpacing: -0.3,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -921,26 +928,49 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     backgroundColor: Palette.surface,
-    borderRadius: 5,
-    padding: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Palette.border,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  metricCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  metricCardContent: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   metricLabel: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     color: Palette.textSecondary,
-    fontWeight: '500',
-    marginBottom: 6,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   metricValue: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
-    color: Palette.text,
-    marginBottom: 4,
+    color: Palette.accentText,
+    marginBottom: 2,
+    lineHeight: 22,
   },
   metricSub: {
     fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
+    lineHeight: 12,
+  },
+  metricIndicator: {
+    height: 2.5,
+    backgroundColor: Palette.primary,
+    borderRadius: 2,
+    marginTop: 6,
+    width: '35%',
   },
   searchBarBox: {
     flexDirection: 'row',
@@ -993,6 +1023,28 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderWidth: 1,
     borderColor: Palette.border,
+  },
+  depositCard: {
+    backgroundColor: Palette.surface,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  emptyCard: {
+    backgroundColor: Palette.surface,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   depositRow: {
     flexDirection: 'row',
@@ -1167,8 +1219,9 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: Typography.fontSize.lg,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
+    letterSpacing: -0.2,
     marginBottom: 12,
   },
   historyRow: {
@@ -1196,7 +1249,10 @@ const styles = StyleSheet.create({
   },
   sheetOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 24,
   },
   modalBackdrop: {
     position: 'absolute',
@@ -1207,14 +1263,15 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.backdrop,
   },
   sheetModalCard: {
+    width: '100%',
+    maxWidth: 440,
     backgroundColor: Palette.surface,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-    borderTopWidth: 1,
+    borderRadius: 8,
+    borderWidth: 1,
     borderColor: Palette.border,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 28,
+    paddingBottom: 20,
     maxHeight: '85%',
   },
   sheetModalHeader: {

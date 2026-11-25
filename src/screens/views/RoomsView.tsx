@@ -13,8 +13,12 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Svg, { Circle, G, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useAppData } from '../../context/AppDataContext';
+import { RoomsBedIcon } from '../../components/CustomIcons';
+
+const roomsHeroBg = require('../../../assets/rooms-hero-bg.png');
 
 export interface RoomsViewProps {
   rooms?: RoomItem[];
@@ -1206,7 +1210,7 @@ export default function RoomsView({
                         activeOpacity={0.7}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
-                        <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                        <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
                       </TouchableOpacity>
                       <View>
                         <Text style={styles.headerTitle}>{activeRoom.roomNumber} - Details</Text>
@@ -1328,7 +1332,7 @@ export default function RoomsView({
                     <View style={styles.specGrid}>
                       <View style={styles.specTile}>
                         <View style={styles.specTileTop}>
-                          <Feather name="grid" size={Typography.iconSize.sm} color={Palette.accentText} />
+                          <RoomsBedIcon size={17} color={Palette.accentText} />
                           <Text style={styles.specTileLabel}>Rooms</Text>
                         </View>
                         <Text style={styles.specTileValue}>
@@ -1528,7 +1532,7 @@ export default function RoomsView({
                         activeOpacity={0.7}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
-                        <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                        <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
                       </TouchableOpacity>
                       <View>
                         <Text style={styles.headerTitle}>Book {activeRoom.roomNumber}</Text>
@@ -1676,18 +1680,11 @@ export default function RoomsView({
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+                    <Feather name="chevron-left" size={24} color={Palette.text} />
                   </TouchableOpacity>
                   <View>
                     <Text style={styles.headerTitle}>
                       {selectedRoomType || selectedFloor || 'Rooms'}
-                    </Text>
-                    <Text style={styles.headerSubtitle}>
-                      {selectedRoomType && selectedFloor
-                        ? `${selectedFloor} · ${currentTypeRooms.length} ${currentTypeRooms.length === 1 ? 'Unit' : 'Units'}`
-                        : selectedFloor
-                          ? `${currentFloorRooms.length} ${currentFloorRooms.length === 1 ? 'Unit' : 'Units'}`
-                          : `${rooms.length} ${rooms.length === 1 ? 'Unit' : 'Units'} · ${displayFloors.length} ${displayFloors.length === 1 ? 'Floor' : 'Floors'}`}
                     </Text>
                   </View>
                 </View>
@@ -1704,39 +1701,121 @@ export default function RoomsView({
 
               {selectedFloor === null ? (
                 /* --- VIEW 1: FLOORS LIST --- */
-                <>
-                  <View style={styles.typesSectionHeaderRow}>
-                    <Text style={styles.sectionTitle}>SELECT FLOOR</Text>
-                    <Text style={styles.sectionCountText}>
-                      {totalOccupiedCount} Occupied · {totalVacantCount} Vacant
-                    </Text>
-                  </View>
+                (() => {
+                  const totalUnits = rooms.length;
+                  const totalOccupied = totalOccupiedCount;
+                  const totalVacant = totalVacantCount;
+                  const occupancyPercent =
+                    totalUnits > 0 ? Math.round((totalOccupied / totalUnits) * 100) : 0;
 
-                  {displayFloors.length === 0 ? (
-                    <View style={styles.emptyCard}>
-                      <Feather name="layers" size={Typography.iconSize.lg} color={Palette.primary} />
-                      <Text style={styles.emptyCardTitle}>No Floors Configured</Text>
-                      <Text style={styles.emptyCardSub}>
-                        Add floors and rooms in Settings to manage them here.
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={styles.roomsCard}>
-                      {displayFloors.map((floorName, index) => {
-                        const isLast = index === displayFloors.length - 1;
-                        const matching = rooms.filter((r) =>
-                          matchesFloorName(getRoomFloor(r), floorName)
-                        );
-                        const occupied = matching.filter(
-                          (r) => r.status === 'Occupied' || r.status === 'Rent due'
-                        ).length;
-                        const vacant = matching.filter((r) => r.status === 'Vacant').length;
+                  const donutSize = 88;
+                  const donutStrokeWidth = 9;
+                  const donutRadius = (donutSize - donutStrokeWidth) / 2;
+                  const donutCircumference = 2 * Math.PI * donutRadius;
+                  const occupancyRatio = totalUnits > 0 ? totalOccupied / totalUnits : 0;
+                  const strokeDash = donutCircumference * occupancyRatio;
 
-                        return (
-                          <View key={floorName}>
+                  return (
+                    <>
+                      {/* Hero Card: Occupancy Donut & Unit Stats */}
+                      <View style={styles.heroCard}>
+                        {/* Background wave cover image */}
+                        <Image
+                          source={roomsHeroBg}
+                          style={styles.heroCardBgImage}
+                          resizeMode="stretch"
+                        />
+
+                        <View style={styles.heroCardContent}>
+                          {/* Donut progress ring */}
+                          <View style={styles.donutContainer}>
+                            <Svg width={donutSize} height={donutSize} viewBox={`0 0 ${donutSize} ${donutSize}`}>
+                              <Defs>
+                                <LinearGradient id="occupancyDonutGrad" x1="0" y1="0" x2="1" y2="1">
+                                  <Stop offset="0%" stopColor="#7928CA" />
+                                  <Stop offset="100%" stopColor={Palette.primary} />
+                                </LinearGradient>
+                              </Defs>
+                              <Circle
+                                cx={donutSize / 2}
+                                cy={donutSize / 2}
+                                r={donutRadius}
+                                stroke="#EDE7F6"
+                                strokeWidth={donutStrokeWidth}
+                                fill="none"
+                              />
+                              <G rotation="-90" origin={`${donutSize / 2}, ${donutSize / 2}`}>
+                                <Circle
+                                  cx={donutSize / 2}
+                                  cy={donutSize / 2}
+                                  r={donutRadius}
+                                  stroke="url(#occupancyDonutGrad)"
+                                  strokeWidth={donutStrokeWidth}
+                                  fill="none"
+                                  strokeDasharray={`${strokeDash} ${donutCircumference}`}
+                                  strokeDashoffset={0}
+                                  strokeLinecap="round"
+                                />
+                              </G>
+                            </Svg>
+                            <View style={styles.donutCenterLabelBlock}>
+                              <Text style={styles.donutPercentText}>{occupancyPercent}%</Text>
+                              <Text style={styles.donutOccupiedText}>Occupied</Text>
+                            </View>
+                          </View>
+
+                          {/* Center vertical divider */}
+                          <View style={styles.heroVerticalDivider} />
+
+                          {/* Right stats column */}
+                          <View style={styles.heroStatsColumn}>
+                            <View style={styles.heroStatItem}>
+                              <Text style={styles.heroStatValue}>{totalUnits}</Text>
+                              <Text style={styles.heroStatLabel}>Total Units</Text>
+                            </View>
+                            <View style={styles.heroStatItem}>
+                              <Text style={styles.heroStatValue}>{totalOccupied}</Text>
+                              <Text style={styles.heroStatLabel}>Occupied</Text>
+                            </View>
+                            <View style={styles.heroStatItem}>
+                              <Text style={styles.heroStatValue}>{totalVacant}</Text>
+                              <Text style={styles.heroStatLabel}>Vacant</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Floor section heading */}
+                      <View style={styles.typesSectionHeaderRow}>
+                        <Text style={styles.sectionTitle}>Select Floor</Text>
+                        <Text style={styles.sectionCountText}>
+                          {totalOccupiedCount} Occupied · {totalVacantCount} Vacant
+                        </Text>
+                      </View>
+
+                      {displayFloors.length === 0 ? (
+                        <View style={styles.emptyCard}>
+                          <Feather name="layers" size={Typography.iconSize.lg} color={Palette.primary} />
+                          <Text style={styles.emptyCardTitle}>No Floors Configured</Text>
+                          <Text style={styles.emptyCardSub}>
+                            Add floors and rooms in Settings to manage them here.
+                          </Text>
+                        </View>
+                      ) : (
+                        displayFloors.map((floorName) => {
+                          const matching = rooms.filter((r) =>
+                            matchesFloorName(getRoomFloor(r), floorName)
+                          );
+                          const occupied = matching.filter(
+                            (r) => r.status === 'Occupied' || r.status === 'Rent due'
+                          ).length;
+                          const vacant = matching.filter((r) => r.status === 'Vacant').length;
+
+                          return (
                             <TouchableOpacity
-                              style={styles.roomTypeItem}
-                              activeOpacity={0.7}
+                              key={floorName}
+                              style={styles.floorCard}
+                              activeOpacity={0.75}
                               onPress={() => {
                                 setSelectedFloor(floorName);
                                 setSelectedRoomType(null);
@@ -1744,30 +1823,38 @@ export default function RoomsView({
                                 setExpandedRoomId(null);
                               }}
                             >
-                              <View style={styles.roomTypeLeft}>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.roomTypeTitle}>{floorName}</Text>
-                                  <Text style={styles.roomTypeSubtitle}>
-                                    {matching.length} {matching.length === 1 ? 'Unit' : 'Units'} · {occupied} Occupied · {vacant} Vacant
+                              <View style={styles.floorCardRow}>
+                                <View style={styles.floorCardLeft}>
+                                  <Text style={styles.floorCardTitle}>{floorName}</Text>
+                                  <Text style={styles.floorCardSubtitle}>
+                                    {matching.length} {matching.length === 1 ? 'Unit' : 'Units'}
                                   </Text>
+
+                                  <View style={styles.floorCardStatsRow}>
+                                    <Text style={styles.floorOccupiedText}>
+                                      {occupied} Occupied
+                                    </Text>
+                                    <View style={styles.floorStatDivider} />
+                                    <Text style={styles.floorVacantText}>
+                                      {vacant} Vacant
+                                    </Text>
+                                  </View>
                                 </View>
+
+                                <Feather name="chevron-right" size={Typography.iconSize.sm} color={Palette.primary} />
                               </View>
-
-                              <Feather name="chevron-right" size={Typography.iconSize.base} color={Palette.primary} />
                             </TouchableOpacity>
-
-                            {!isLast && <View style={styles.divider} />}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
-                </>
+                          );
+                        })
+                      )}
+                    </>
+                  );
+                })()
               ) : selectedRoomType === null ? (
                 /* --- VIEW 2: ROOM TYPES ON SELECTED FLOOR --- */
                 <>
                   <View style={styles.typesSectionHeaderRow}>
-                    <Text style={styles.sectionTitle}>SELECT ROOM TYPE</Text>
+                    <Text style={styles.sectionTitle}>Select Room Type</Text>
                     <Text style={styles.sectionCountText}>
                       {floorOccupiedCount} Occupied · {floorVacantCount} Vacant
                     </Text>
@@ -1782,45 +1869,49 @@ export default function RoomsView({
                       </Text>
                     </View>
                   ) : (
-                    <View style={styles.roomsCard}>
-                      {floorRoomTypes.map((type, index) => {
-                        const isLast = index === floorRoomTypes.length - 1;
-                        const matching = currentFloorRooms.filter((r) =>
-                          matchesRoomType(r.type, type)
-                        );
-                        const occupied = matching.filter(
-                          (r) => r.status === 'Occupied' || r.status === 'Rent due'
-                        ).length;
-                        const vacant = matching.filter((r) => r.status === 'Vacant').length;
+                    floorRoomTypes.map((type) => {
+                      const matching = currentFloorRooms.filter((r) =>
+                        matchesRoomType(r.type, type)
+                      );
+                      const occupied = matching.filter(
+                        (r) => r.status === 'Occupied' || r.status === 'Rent due'
+                      ).length;
+                      const vacant = matching.filter((r) => r.status === 'Vacant').length;
 
-                        return (
-                          <View key={type}>
-                            <TouchableOpacity
-                              style={styles.roomTypeItem}
-                              activeOpacity={0.7}
-                              onPress={() => {
-                                setSelectedRoomType(type);
-                                setFilter('All');
-                                setExpandedRoomId(null);
-                              }}
-                            >
-                              <View style={styles.roomTypeLeft}>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.roomTypeTitle}>{type}</Text>
-                                  <Text style={styles.roomTypeSubtitle}>
-                                    {matching.length} {matching.length === 1 ? 'Unit' : 'Units'} · {occupied} Occupied · {vacant} Vacant
-                                  </Text>
-                                </View>
+                      return (
+                        <TouchableOpacity
+                          key={type}
+                          style={styles.floorCard}
+                          activeOpacity={0.75}
+                          onPress={() => {
+                            setSelectedRoomType(type);
+                            setFilter('All');
+                            setExpandedRoomId(null);
+                          }}
+                        >
+                          <View style={styles.floorCardRow}>
+                            <View style={styles.floorCardLeft}>
+                              <Text style={styles.floorCardTitle}>{type}</Text>
+                              <Text style={styles.floorCardSubtitle}>
+                                {matching.length} {matching.length === 1 ? 'Unit' : 'Units'}
+                              </Text>
+
+                              <View style={styles.floorCardStatsRow}>
+                                <Text style={styles.floorOccupiedText}>
+                                  {occupied} Occupied
+                                </Text>
+                                <View style={styles.floorStatDivider} />
+                                <Text style={styles.floorVacantText}>
+                                  {vacant} Vacant
+                                </Text>
                               </View>
+                            </View>
 
-                              <Feather name="chevron-right" size={Typography.iconSize.base} color={Palette.primary} />
-                            </TouchableOpacity>
-
-                            {!isLast && <View style={styles.divider} />}
+                            <Feather name="chevron-right" size={Typography.iconSize.sm} color={Palette.primary} />
                           </View>
-                        );
-                      })}
-                    </View>
+                        </TouchableOpacity>
+                      );
+                    })
                   )}
                 </>
               ) : (
@@ -1929,7 +2020,7 @@ export default function RoomsView({
                                 <View style={styles.expandedSpecsBlock}>
                                   <View style={styles.expandedSpecRow}>
                                     <View style={styles.expandedSpecLeft}>
-                                      <Feather name="grid" size={Typography.iconSize.sm} color={Palette.primary} />
+                                      <RoomsBedIcon size={17} color={Palette.primary} />
                                       <Text style={styles.expandedSpecLabel}>Configuration</Text>
                                     </View>
                                     <Text style={styles.expandedSpecValue}>
@@ -2148,7 +2239,7 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 24,
     backgroundColor: Palette.background,
   },
@@ -2161,7 +2252,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -2175,13 +2266,12 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.3,
-    fontFamily: Typography.fontFamily.serif,
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '500',
     marginTop: 2,
@@ -2210,6 +2300,83 @@ const styles = StyleSheet.create({
     color: Palette.accentText,
     fontWeight: '700',
   },
+  heroCard: {
+    backgroundColor: Palette.surface,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    marginBottom: 12,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  heroCardContent: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingLeft: 36,
+    paddingRight: 20,
+  },
+  donutContainer: {
+    width: 88,
+    height: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  donutCenterLabelBlock: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  donutPercentText: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Palette.primary,
+    letterSpacing: -0.5,
+  },
+  donutOccupiedText: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: Palette.textSecondary,
+    marginTop: 1,
+  },
+  heroVerticalDivider: {
+    width: 1,
+    height: 56,
+    backgroundColor: Palette.border,
+    marginHorizontal: 22,
+  },
+  heroStatsColumn: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 2,
+    gap: 5,
+  },
+  heroStatItem: {
+    justifyContent: 'center',
+  },
+  heroStatValue: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '800',
+    color: Palette.text,
+    lineHeight: 18,
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    color: Palette.textSecondary,
+    fontWeight: '500',
+  },
+
   typesSectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2219,15 +2386,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.caption,
-    fontWeight: '700',
-    color: Palette.accentText,
-    letterSpacing: 0.8,
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Palette.text,
+    letterSpacing: -0.2,
   },
   sectionCountText: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: Typography.fontSize.sm,
     fontWeight: '600',
     color: Palette.textSecondary,
+  },
+  floorCard: {
+    backgroundColor: Palette.surface,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  floorCardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  floorCardLeft: {
+    flex: 1,
+  },
+  floorCardTitle: {
+    fontSize: Typography.fontSize.base,
+    fontWeight: '700',
+    color: Palette.text,
+    lineHeight: 18,
+  },
+  floorCardSubtitle: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: Palette.textSecondary,
+    lineHeight: 14,
+    marginTop: 1,
+  },
+  floorCardStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  floorOccupiedText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Palette.primary,
+    lineHeight: 14,
+  },
+  floorStatDivider: {
+    width: 1,
+    height: 10,
+    backgroundColor: Palette.border,
+    marginHorizontal: 8,
+  },
+  floorVacantText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Palette.text,
+    lineHeight: 14,
   },
   roomTypeItem: {
     flexDirection: 'row',
@@ -3111,7 +3331,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.lg,
     fontWeight: '700',
     color: Palette.text,
-    fontFamily: Typography.fontFamily.serif,
     marginBottom: 6,
   },
   receiptMessage: {

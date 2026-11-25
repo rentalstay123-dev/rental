@@ -12,11 +12,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../constants/theme';
+import { ReportsBarIcon } from './CustomIcons';
 
 export type DrawerMenuKey =
+  | 'Requests'
   | 'Deposits'
   | 'Staff'
   | 'Reports'
+  | 'Policy'
   | 'Settings'
   | 'Profile';
 
@@ -37,6 +40,12 @@ interface MenuItemConfig {
 
 const PRIMARY_MENU_ITEMS: MenuItemConfig[] = [
   {
+    key: 'Requests',
+    label: 'Requests',
+    subtitle: 'Service & maintenance',
+    icon: 'clipboard',
+  },
+  {
     key: 'Deposits',
     label: 'Deposits',
     subtitle: 'Held and refunds',
@@ -55,9 +64,15 @@ const PRIMARY_MENU_ITEMS: MenuItemConfig[] = [
     icon: 'bar-chart-2',
   },
   {
+    key: 'Policy',
+    label: 'Policy',
+    subtitle: 'Agreements & house rules',
+    icon: 'file-text',
+  },
+  {
     key: 'Settings',
     label: 'Settings',
-    subtitle: 'Floors, rooms & rental rules',
+    subtitle: 'Floors, rooms & configurations',
     icon: 'settings',
   },
 ];
@@ -109,7 +124,7 @@ export default function HamburgerDrawer({
               style={styles.closeSquareButton}
               activeOpacity={0.7}
             >
-              <Feather name="x" size={Typography.iconSize.base} color={Palette.onPrimary} />
+              <Feather name="x" size={Typography.iconSize.header} color={Palette.onPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -131,7 +146,11 @@ export default function HamburgerDrawer({
                 activeOpacity={0.7}
               >
                 <View style={styles.iconCol}>
-                  <Feather name={item.icon} size={20} color={Palette.primary} />
+                  {item.key === 'Reports' ? (
+                    <ReportsBarIcon size={20} color={Palette.primary} />
+                  ) : (
+                    <Feather name={item.icon} size={20} color={Palette.primary} />
+                  )}
                 </View>
                 <View style={styles.textCol}>
                   <Text style={styles.menuLabel}>{item.label}</Text>
@@ -229,7 +248,6 @@ const styles = StyleSheet.create({
     color: Palette.onPrimary,
     marginLeft: 10,
     letterSpacing: 0.5,
-    fontFamily: Typography.fontFamily.serif,
   },
   closeSquareButton: {
     width: 34,

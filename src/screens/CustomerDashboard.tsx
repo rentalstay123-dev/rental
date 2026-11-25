@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../constants/theme';
 import { CustomerDataProvider, useCustomerData } from '../context/CustomerDataContext';
+import { RoomsBedIcon } from '../components/CustomIcons';
 import CustomerDrawer, { CustomerDrawerMenuKey } from '../components/CustomerDrawer';
 import CustomerHomeView, { CustomerPageKey } from './customer/CustomerHomeView';
 import CustomerRoomView from './customer/CustomerRoomView';
@@ -18,6 +19,7 @@ import CustomerPaymentsView from './customer/CustomerPaymentsView';
 import CustomerRequestsView from './customer/CustomerRequestsView';
 import CustomerNoticesView from './customer/CustomerNoticesView';
 import CustomerProfileView from './customer/CustomerProfileView';
+import CustomerRulesAndDocsView from './customer/CustomerRulesAndDocsView';
 
 interface CustomerDashboardProps {
   uid: string;
@@ -27,13 +29,14 @@ interface CustomerDashboardProps {
 }
 
 const FOOTER_TABS: {
-  key: Extract<CustomerPageKey, 'Home' | 'Room' | 'Payments' | 'Profile'>;
+  key: Extract<CustomerPageKey, 'Home' | 'Room' | 'Payments' | 'Requests' | 'Profile'>;
   label: string;
   icon: keyof typeof Feather.glyphMap;
 }[] = [
   { key: 'Home', label: 'Home', icon: 'home' },
   { key: 'Room', label: 'Room', icon: 'key' },
   { key: 'Payments', label: 'Payments', icon: 'credit-card' },
+  { key: 'Requests', label: 'Requests', icon: 'tool' },
   { key: 'Profile', label: 'Profile', icon: 'user' },
 ];
 
@@ -112,6 +115,13 @@ function CustomerDashboardContent({ onLogout }: { onLogout?: () => void }) {
             onLogout={onLogout}
           />
         );
+      case 'RulesAndDocs':
+        return (
+          <CustomerRulesAndDocsView
+            showBackButton
+            onBack={() => navigateToTab('Home')}
+          />
+        );
       case 'Home':
       default:
         return (
@@ -151,7 +161,7 @@ function CustomerDashboardContent({ onLogout }: { onLogout?: () => void }) {
           accessibilityRole="button"
           accessibilityLabel="Open menu"
         >
-          <Feather name="menu" size={Typography.iconSize.base} color={Palette.onPrimary} />
+          <Feather name="menu" size={Typography.iconSize.header} color={Palette.onPrimary} />
         </TouchableOpacity>
 
         <View style={styles.headerBrandContainer}>
@@ -169,7 +179,7 @@ function CustomerDashboardContent({ onLogout }: { onLogout?: () => void }) {
             navigateToTab('Notices');
           }}
         >
-          <Feather name="bell" size={Typography.iconSize.base} color={Palette.onPrimary} />
+          <Feather name="bell" size={Typography.iconSize.header} color={Palette.onPrimary} />
           {unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
         </TouchableOpacity>
       </View>
@@ -202,11 +212,18 @@ function CustomerDashboardContent({ onLogout }: { onLogout?: () => void }) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: isActive }}
               >
-                <Feather
-                  name={tab.icon}
-                  size={Typography.iconSize.base}
-                  color={isActive ? Palette.surface : Palette.textSecondary}
-                />
+                {tab.key === 'Room' ? (
+                  <RoomsBedIcon
+                    size={21}
+                    color={isActive ? Palette.surface : Palette.textSecondary}
+                  />
+                ) : (
+                  <Feather
+                    name={tab.icon}
+                    size={Typography.iconSize.footer}
+                    color={isActive ? Palette.surface : Palette.textSecondary}
+                  />
+                )}
                 <Text
                   style={[
                     styles.navLabel,
@@ -287,7 +304,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Palette.onPrimary,
     letterSpacing: 0.5,
-    fontFamily: Typography.fontFamily.serif,
   },
   syncErrorBar: {
     flexDirection: 'row',

@@ -12,13 +12,55 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../constants/theme';
+import { RoomsBedIcon } from './CustomIcons';
 
 export type CustomerDrawerMenuKey =
   | 'Room'
   | 'Payments'
   | 'Requests'
   | 'Notices'
+  | 'RulesAndDocs'
   | 'Profile';
+
+interface MenuItemConfig {
+  key: CustomerDrawerMenuKey;
+  label: string;
+  subtitle: string;
+  icon: keyof typeof Feather.glyphMap;
+}
+
+const PRIMARY_MENU_ITEMS: MenuItemConfig[] = [
+  {
+    key: 'Room',
+    label: 'Room',
+    subtitle: 'Room details & lease',
+    icon: 'key',
+  },
+  {
+    key: 'Payments',
+    label: 'Payments',
+    subtitle: 'Rent history & dues',
+    icon: 'credit-card',
+  },
+  {
+    key: 'Requests',
+    label: 'Requests',
+    subtitle: 'Service & maintenance',
+    icon: 'tool',
+  },
+  {
+    key: 'Notices',
+    label: 'Notification',
+    subtitle: 'Announcements & alerts',
+    icon: 'bell',
+  },
+  {
+    key: 'RulesAndDocs',
+    label: 'Policy',
+    subtitle: 'Property rules & agreement',
+    icon: 'file-text',
+  },
+];
 
 interface CustomerDrawerProps {
   visible: boolean;
@@ -66,7 +108,7 @@ export default function CustomerDrawer({
               <View style={styles.brandTextCol}>
                 <Text style={styles.brandTitle}>Luvora</Text>
                 {roomNumber ? (
-                  <Text style={styles.brandSub}>{roomNumber} · Resident</Text>
+                  <Text style={styles.brandSub}>{roomNumber}</Text>
                 ) : null}
               </View>
             </View>
@@ -79,7 +121,7 @@ export default function CustomerDrawer({
               accessibilityRole="button"
               accessibilityLabel="Close menu"
             >
-              <Feather name="x" size={Typography.iconSize.base} color={Palette.onPrimary} />
+              <Feather name="x" size={Typography.iconSize.header} color={Palette.onPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -91,6 +133,32 @@ export default function CustomerDrawer({
               { paddingBottom: Math.max(insets.bottom, 16) + 20 },
             ]}
           >
+            {PRIMARY_MENU_ITEMS.map((item) => (
+              <TouchableOpacity
+                key={item.key}
+                style={styles.menuRow}
+                onPress={() => handleItemPress(item.key)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.iconCol}>
+                  {item.key === 'Room' ? (
+                    <RoomsBedIcon size={22} color={Palette.primary} />
+                  ) : (
+                    <Feather name={item.icon} size={20} color={Palette.primary} />
+                  )}
+                </View>
+                <View style={styles.textCol}>
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+                <Feather name="chevron-right" size={Typography.iconSize.base} color={Palette.primary} />
+              </TouchableOpacity>
+            ))}
+
+            <View style={styles.menuDivider} />
+
+            <Text style={styles.accountHeader}>ACCOUNT</Text>
+
             <TouchableOpacity
               style={styles.menuRow}
               onPress={() => handleItemPress('Profile')}
@@ -178,7 +246,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Palette.onPrimary,
     letterSpacing: 0.5,
-    fontFamily: Typography.fontFamily.serif,
   },
   brandSub: {
     fontSize: Typography.fontSize.caption,
@@ -231,6 +298,19 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     color: Palette.textSecondary,
     marginTop: 2,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: Palette.border,
+    marginVertical: 14,
+  },
+  accountHeader: {
+    fontSize: Typography.fontSize.caption,
+    fontWeight: '700',
+    color: Palette.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: 6,
+    paddingHorizontal: 4,
   },
   logoutButton: {
     flexDirection: 'row',

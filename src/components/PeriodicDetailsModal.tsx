@@ -9,6 +9,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -46,10 +47,6 @@ const CALENDAR_MONTHS_FULL = [
 ];
 const CALENDAR_WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-function formatCalendarDate(year: number, monthIndex: number, day: number): string {
-  return `${String(day).padStart(2, '0')} ${CALENDAR_MONTHS_SHORT[monthIndex]} ${year}`;
-}
-
 function buildCalendarWeeks(year: number, monthIndex: number): (number | null)[][] {
   const firstDayOfWeek = new Date(year, monthIndex, 1).getDay();
   const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -86,9 +83,13 @@ function formatMMDDYYYY(d: Date): string {
   return `${mm}/${dd}/${yyyy}`;
 }
 
+function formatDateDisplay(d: Date): string {
+  return `${String(d.getDate()).padStart(2, '0')} ${CALENDAR_MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetailsModalProps) {
   const insets = useSafeAreaInsets();
-  const { transactions, rentList, staff, profile, notifications } = useAppData();
+  const { transactions, rentList, staff, profile, notifications, refreshWorkspace } = useAppData();
   const unreadCount = notifications ? notifications.filter((n) => !n.isRead).length : 0;
 
   const now = useMemo(() => new Date(), []);
@@ -96,15 +97,15 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
 
   // Date Filters
   const [activePreset, setActivePreset] = useState<PeriodPreset>('This Month');
-  const [fromDate, setFromDate] = useState<Date>(() => new Date(now.getFullYear(), now.getMonth(), 1));
-  const [toDate, setToDate] = useState<Date>(() => new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59));
+  const [fromDate, setFromDate] = useState<Date>(() => new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0));
+  const [toDate, setToDate] = useState<Date>(() => new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999));
 
   // Calendar Dropdown State
-  const [selectedDate, setSelectedDate] = useState<Date | null>(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-  const [selectedDateStr, setSelectedDateStr] = useState<string>(() => `${CALENDAR_MONTHS_FULL[now.getMonth()]} ${now.getFullYear()}`);
+  const [activeDateField, setActiveDateField] = useState<'from' | 'to'>('from');
   const [calendarYear, setCalendarYear] = useState<number>(now.getFullYear());
   const [calendarMonth, setCalendarMonth] = useState<number>(now.getMonth());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Category filter and search
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,6 +114,17 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
 
   const calendarWeeks = useMemo(() => buildCalendarWeeks(calendarYear, calendarMonth), [calendarYear, calendarMonth]);
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshWorkspace();
+    } catch {
+      // ignore
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Handle Preset Clicks
   const handleSelectPreset = (preset: 'This Month' | 'Last Month' | 'Last 30 Days' | 'This Year' | 'All') => {
     setActivePreset(preset);
@@ -120,52 +132,47 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
     const today = new Date();
 
     if (preset === 'This Month') {
-      const start = new Date(today.getFullYear(), today.getMonth(), 1);
-      const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+      const start = new Date(today.getFullYear(), today.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
       setFromDate(start);
       setToDate(end);
-      setSelectedDate(today);
-      setSelectedDateStr(`${CALENDAR_MONTHS_FULL[today.getMonth()]} ${today.getFullYear()}`);
       setCalendarYear(today.getFullYear());
       setCalendarMonth(today.getMonth());
     } else if (preset === 'Last Month') {
-      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const end = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59);
+      const start = new Date(today.getFullYear(), today.getMonth() - 1, 1, 0, 0, 0, 0);
+      const end = new Date(today.getFullYear(), today.getMonth(), 0, 23, 59, 59, 999);
       setFromDate(start);
       setToDate(end);
-      setSelectedDate(start);
       const lastMonthIdx = (today.getMonth() + 11) % 12;
       const lastMonthYear = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
-      setSelectedDateStr(`${CALENDAR_MONTHS_FULL[lastMonthIdx]} ${lastMonthYear}`);
       setCalendarYear(lastMonthYear);
       setCalendarMonth(lastMonthIdx);
     } else if (preset === 'Last 30 Days') {
       const start = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
       start.setHours(0, 0, 0, 0);
-      const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+      const end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
       setFromDate(start);
       setToDate(end);
-      setSelectedDate(today);
-      setSelectedDateStr('Last 30 Days');
       setCalendarYear(today.getFullYear());
       setCalendarMonth(today.getMonth());
     } else if (preset === 'This Year') {
-      const start = new Date(today.getFullYear(), 0, 1);
-      const end = new Date(today.getFullYear(), 11, 31, 23, 59, 59);
+      const start = new Date(today.getFullYear(), 0, 1, 0, 0, 0, 0);
+      const end = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
       setFromDate(start);
       setToDate(end);
-      setSelectedDate(today);
-      setSelectedDateStr(`Year ${today.getFullYear()}`);
       setCalendarYear(today.getFullYear());
       setCalendarMonth(today.getMonth());
     } else if (preset === 'All') {
-      const start = new Date(2020, 0, 1);
-      const end = new Date(today.getFullYear() + 1, 11, 31, 23, 59, 59);
+      const start = new Date(2020, 0, 1, 0, 0, 0, 0);
+      const end = new Date(today.getFullYear() + 1, 11, 31, 23, 59, 59, 999);
       setFromDate(start);
       setToDate(end);
-      setSelectedDate(null);
-      setSelectedDateStr('All Dates');
     }
+  };
+
+  const handleSelectToday = () => {
+    const today = new Date();
+    handleSelectCalendarDay(today.getFullYear(), today.getMonth(), today.getDate());
   };
 
   const handlePrevCalendarMonth = () => {
@@ -187,25 +194,24 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
   };
 
   const handleSelectCalendarDay = (y: number, m: number, d: number) => {
-    const chosen = new Date(y, m, d);
-    setSelectedDate(chosen);
-    setSelectedDateStr(formatCalendarDate(y, m, d));
-    const startOfDay = new Date(y, m, d, 0, 0, 0, 0);
-    const endOfDay = new Date(y, m, d, 23, 59, 59, 999);
-    setFromDate(startOfDay);
-    setToDate(endOfDay);
     setActivePreset(null);
-    setIsCalendarOpen(false);
-  };
-
-  const handleSelectCalendarMonth = (y: number, m: number) => {
-    const startOfMonth = new Date(y, m, 1, 0, 0, 0, 0);
-    const endOfMonth = new Date(y, m + 1, 0, 23, 59, 59, 999);
-    setFromDate(startOfMonth);
-    setToDate(endOfMonth);
-    setSelectedDateStr(`${CALENDAR_MONTHS_FULL[m]} ${y}`);
-    setActivePreset(null);
-    setIsCalendarOpen(false);
+    if (activeDateField === 'from') {
+      const newFrom = new Date(y, m, d, 0, 0, 0, 0);
+      setFromDate(newFrom);
+      if (newFrom.getTime() > toDate.getTime()) {
+        setToDate(new Date(y, m, d, 23, 59, 59, 999));
+      }
+      setActiveDateField('to');
+    } else {
+      const newTo = new Date(y, m, d, 23, 59, 59, 999);
+      if (newTo.getTime() < fromDate.getTime()) {
+        setFromDate(new Date(y, m, d, 0, 0, 0, 0));
+        setToDate(newTo);
+      } else {
+        setToDate(newTo);
+      }
+      setIsCalendarOpen(false);
+    }
   };
 
   // Build Comprehensive Rental Spreadsheet Rows
@@ -359,7 +365,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
             accessibilityRole="button"
             accessibilityLabel="Close"
           >
-            <Feather name="menu" size={Typography.iconSize.base} color={Palette.onPrimary} />
+            <Feather name="menu" size={Typography.iconSize.header} color={Palette.onPrimary} />
           </TouchableOpacity>
 
           {/* Luvora Wordmark */}
@@ -376,7 +382,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
             accessibilityLabel="Notifications"
             onPress={onClose}
           >
-            <Feather name="bell" size={Typography.iconSize.base} color={Palette.onPrimary} />
+            <Feather name="bell" size={Typography.iconSize.header} color={Palette.onPrimary} />
             {unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
           </TouchableOpacity>
         </View>
@@ -392,7 +398,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
               accessibilityRole="button"
               accessibilityLabel="Go back"
             >
-              <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
+              <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
             </TouchableOpacity>
             <View>
               <Text style={styles.pageTitle}>Periodic Details</Text>
@@ -410,35 +416,102 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[Palette.primary]}
+                tintColor={Palette.primary}
+              />
+            }
           >
           {/* ========================================================================= */}
-          {/* SECTION 1: Date Period Filter with Calendar Dropdown                      */}
+          {/* SECTION 1: Date Period Filter with From & To Calendar Range               */}
           {/* ========================================================================= */}
           <View style={styles.filterCard}>
             <View style={styles.dateFieldContainer}>
-              <Text style={styles.inputFieldLabel}>DATE</Text>
-              <TouchableOpacity
-                style={styles.selectBox}
-                activeOpacity={0.75}
-                onPress={() => setIsCalendarOpen((prev) => !prev)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select date ${selectedDateStr}`}
-              >
-                <View style={styles.selectLeftCol}>
-                  <Feather
-                    name="calendar"
-                    size={Typography.iconSize.sm}
-                    color={Palette.primary}
-                    style={styles.inputLeftIcon}
-                  />
-                  <Text style={styles.selectValue}>{selectedDateStr}</Text>
+              {/* FROM and TO Date Selectors */}
+              <View style={styles.dateRangeRow}>
+                <View style={styles.dateFieldCol}>
+                  <Text style={styles.inputFieldLabel}>FROM</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.selectBox,
+                      isCalendarOpen && activeDateField === 'from' && styles.selectBoxActive,
+                    ]}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      if (isCalendarOpen && activeDateField === 'from') {
+                        setIsCalendarOpen(false);
+                      } else {
+                        setActiveDateField('from');
+                        setCalendarYear(fromDate.getFullYear());
+                        setCalendarMonth(fromDate.getMonth());
+                        setIsCalendarOpen(true);
+                      }
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`From date ${formatDateDisplay(fromDate)}`}
+                  >
+                    <View style={styles.selectLeftCol}>
+                      <Feather
+                        name="calendar"
+                        size={Typography.iconSize.sm}
+                        color={Palette.primary}
+                        style={styles.inputLeftIcon}
+                      />
+                      <Text style={styles.selectValue} numberOfLines={1}>
+                        {formatDateDisplay(fromDate)}
+                      </Text>
+                    </View>
+                    <Feather
+                      name={isCalendarOpen && activeDateField === 'from' ? 'chevron-up' : 'chevron-down'}
+                      size={Typography.iconSize.sm}
+                      color={Palette.primary}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <Feather
-                  name={isCalendarOpen ? 'chevron-up' : 'chevron-down'}
-                  size={Typography.iconSize.sm}
-                  color={Palette.primary}
-                />
-              </TouchableOpacity>
+
+                <View style={styles.dateFieldCol}>
+                  <Text style={styles.inputFieldLabel}>TO</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.selectBox,
+                      isCalendarOpen && activeDateField === 'to' && styles.selectBoxActive,
+                    ]}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      if (isCalendarOpen && activeDateField === 'to') {
+                        setIsCalendarOpen(false);
+                      } else {
+                        setActiveDateField('to');
+                        setCalendarYear(toDate.getFullYear());
+                        setCalendarMonth(toDate.getMonth());
+                        setIsCalendarOpen(true);
+                      }
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`To date ${formatDateDisplay(toDate)}`}
+                  >
+                    <View style={styles.selectLeftCol}>
+                      <Feather
+                        name="calendar"
+                        size={Typography.iconSize.sm}
+                        color={Palette.primary}
+                        style={styles.inputLeftIcon}
+                      />
+                      <Text style={styles.selectValue} numberOfLines={1}>
+                        {formatDateDisplay(toDate)}
+                      </Text>
+                    </View>
+                    <Feather
+                      name={isCalendarOpen && activeDateField === 'to' ? 'chevron-up' : 'chevron-down'}
+                      size={Typography.iconSize.sm}
+                      color={Palette.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* Calendar Dropdown */}
               {isCalendarOpen && (
@@ -453,16 +526,11 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                     >
                       <Feather name="chevron-left" size={Typography.iconSize.sm} color={Palette.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => handleSelectCalendarMonth(calendarYear, calendarMonth)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Select entire month"
-                    >
+                    <View>
                       <Text style={styles.calendarMonthTitle}>
                         {CALENDAR_MONTHS_FULL[calendarMonth]} {calendarYear}
                       </Text>
-                    </TouchableOpacity>
+                    </View>
                     <TouchableOpacity
                       style={styles.calendarNavBtn}
                       onPress={handleNextCalendarMonth}
@@ -488,17 +556,31 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                         if (day === null) {
                           return <View key={`empty-${wIdx}-${dIdx}`} style={styles.calendarDayCell} />;
                         }
-                        const isSelected =
-                          selectedDate !== null &&
-                          selectedDate.getFullYear() === calendarYear &&
-                          selectedDate.getMonth() === calendarMonth &&
-                          selectedDate.getDate() === day;
+                        const cellTime = new Date(calendarYear, calendarMonth, day).getTime();
+                        const fromTime = new Date(
+                          fromDate.getFullYear(),
+                          fromDate.getMonth(),
+                          fromDate.getDate()
+                        ).getTime();
+                        const toTime = new Date(
+                          toDate.getFullYear(),
+                          toDate.getMonth(),
+                          toDate.getDate()
+                        ).getTime();
+
+                        const todayTs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                        const isToday = cellTime === todayTs;
+
+                        const isFrom = cellTime === fromTime;
+                        const isTo = cellTime === toTime;
+                        const isSelected = isFrom || isTo;
 
                         return (
                           <TouchableOpacity
                             key={`day-${calendarYear}-${calendarMonth}-${day}`}
                             style={[
                               styles.calendarDayCell,
+                              isToday && !isSelected && styles.calendarDayCellToday,
                               isSelected && styles.calendarDayCellSelected,
                             ]}
                             activeOpacity={0.75}
@@ -509,6 +591,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                             <Text
                               style={[
                                 styles.calendarDayText,
+                                isToday && !isSelected && styles.calendarDayTextToday,
                                 isSelected && styles.calendarDayTextSelected,
                               ]}
                             >
@@ -519,6 +602,20 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                       })}
                     </View>
                   ))}
+
+                  {/* Quick 'Today' Selector inside calendar */}
+                  <View style={styles.calendarFooterRow}>
+                    <TouchableOpacity
+                      style={styles.calendarTodayBtn}
+                      onPress={handleSelectToday}
+                      activeOpacity={0.7}
+                      hitSlop={{ top: 8, bottom: 8, left: 12, right: 12 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Select Today"
+                    >
+                      <Text style={styles.calendarTodayBtnText}>Today</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
             </View>
@@ -544,7 +641,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
           </View>
 
           {/* ========================================================================= */}
-          {/* SECTION 2: Financial Summary Overview Cards (Matching Reference Image)    */}
+          {/* SECTION 2: Financial Summary Overview Cards                               */}
           {/* ========================================================================= */}
           <View style={styles.summaryOverviewRow}>
             {/* Inflow Card */}
@@ -553,13 +650,13 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                 TOTAL INFLOW
               </Text>
               <Text
-                style={[styles.overviewCardValue, { color: Palette.status.paid.text }]}
+                style={[styles.overviewCardValue, { color: '#15803D' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
                 {formatRupeeAmount(totalInflow)}
               </Text>
-              <View style={[styles.cardAccentBar, { backgroundColor: Palette.status.paid.text }]} />
+              <View style={[styles.cardAccentBar, { backgroundColor: '#15803D' }]} />
             </View>
 
             {/* Outflow Card */}
@@ -568,13 +665,13 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                 TOTAL OUTFLOW
               </Text>
               <Text
-                style={[styles.overviewCardValue, { color: Palette.status.overdue.text }]}
+                style={[styles.overviewCardValue, { color: '#B91C1C' }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
                 {formatRupeeAmount(totalOutflow)}
               </Text>
-              <View style={[styles.cardAccentBar, { backgroundColor: Palette.status.overdue.text }]} />
+              <View style={[styles.cardAccentBar, { backgroundColor: '#B91C1C' }]} />
             </View>
 
             {/* Net Balance Card */}
@@ -630,7 +727,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
           </View>
 
           {/* ========================================================================= */}
-          {/* SECTION 3: Spreadsheet Preview Table (Matching Reference Image 1)         */}
+          {/* SECTION 3: Spreadsheet Preview Table                                      */}
           {/* ========================================================================= */}
           <View style={styles.tableCard}>
             {/* Table Header Bar */}
@@ -639,7 +736,6 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                 <Feather name="grid" size={16} color={Palette.primary} />
                 <Text style={styles.tableTopBarTitle}>Spreadsheet Preview</Text>
               </View>
-              <Text style={styles.tableRowCountText}>{filteredRows.length} rows</Text>
             </View>
 
             {/* Horizontally Scrollable Data Table */}
@@ -743,9 +839,7 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                   onPress={() => setVisibleCount((prev) => prev + 25)}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.loadMoreText}>
-                    Load More ({paginatedRows.length} of {filteredRows.length})
-                  </Text>
+                  <Text style={styles.loadMoreText}>Load More</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -796,7 +890,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Palette.onPrimary,
     letterSpacing: 0.5,
-    fontFamily: Typography.fontFamily.serif,
   },
   subHeaderRow: {
     flexDirection: 'row',
@@ -814,20 +907,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   backCircleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Palette.border,
+    padding: 4,
+    marginRight: 4,
   },
   pageTitle: {
     fontSize: Typography.fontSize.lg,
     fontWeight: '700',
     color: Palette.text,
-    fontFamily: Typography.fontFamily.serif,
   },
   pageSubtitle: {
     fontSize: Typography.fontSize.caption,
@@ -858,17 +946,24 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
 
-  /* SECTION 1: Period Filter Bar Styles (Matching Reference Image 2 in Luvora Theme) */
+  /* SECTION 1: Period Filter Bar Styles */
   filterCard: {
     backgroundColor: Palette.surface,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
     padding: 14,
     marginBottom: 14,
   },
   dateFieldContainer: {
     marginBottom: 12,
+  },
+  dateRangeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  dateFieldCol: {
+    flex: 1,
   },
   inputFieldLabel: {
     fontSize: Typography.fontSize.caption,
@@ -883,10 +978,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: Palette.tint,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
     borderRadius: 5,
     paddingHorizontal: 12,
     height: 42,
+  },
+  selectBoxActive: {
+    borderColor: Palette.primary,
+    backgroundColor: Palette.surface,
   },
   selectLeftCol: {
     flexDirection: 'row',
@@ -904,7 +1003,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
     borderRadius: 5,
     padding: 12,
   },
@@ -949,6 +1048,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  calendarDayCellToday: {
+    borderWidth: 1,
+    borderColor: Palette.primary,
+  },
   calendarDayCellSelected: {
     backgroundColor: Palette.primary,
   },
@@ -957,9 +1060,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Palette.text,
   },
+  calendarDayTextToday: {
+    color: Palette.primary,
+    fontWeight: '700',
+  },
   calendarDayTextSelected: {
     color: Palette.onPrimary,
     fontWeight: '700',
+  },
+  calendarFooterRow: {
+    marginTop: 4,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 6,
+  },
+  calendarTodayBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+  },
+  calendarTodayBtnText: {
+    fontSize: Typography.fontSize.sm,
+    fontWeight: '700',
+    color: Palette.primary,
   },
   presetsRow: {
     flexDirection: 'row',
@@ -975,7 +1097,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: Palette.iconBg,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
   },
   presetBtnActive: {
     backgroundColor: Palette.primary,
@@ -994,39 +1116,52 @@ const styles = StyleSheet.create({
   /* SECTION 2: Overview Cards (Clean, Professional & Aligned) */
   summaryOverviewRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
+    gap: 10,
+    marginBottom: 16,
   },
   overviewCard: {
     flex: 1,
     backgroundColor: Palette.surface,
-    paddingVertical: 10,
-    paddingHorizontal: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: Palette.border,
-    minHeight: 82,
+    borderColor: '#E2E8F0',
+    minHeight: 88,
     justifyContent: 'space-between',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+      },
+      default: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.04,
+        shadowRadius: 2,
+        elevation: 1,
+      },
+    }),
   },
   overviewCardLabel: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontWeight: '700',
-    color: Palette.textSecondary,
+    color: '#000000',
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    minHeight: 24,
+    letterSpacing: 0.5,
+    minHeight: 26,
+    lineHeight: 13,
   },
   overviewCardValue: {
-    fontSize: 16.5,
+    fontSize: 18,
     fontWeight: '800',
     marginVertical: 4,
     letterSpacing: -0.3,
   },
   cardAccentBar: {
-    height: 3.5,
+    height: 3,
     borderRadius: 2,
     width: '100%',
-    marginTop: 6,
+    marginTop: 8,
   },
 
   /* Search & Filter Bar */
@@ -1034,7 +1169,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   searchBox: {
     flex: 1,
@@ -1042,10 +1177,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
     borderRadius: 5,
     paddingHorizontal: 10,
-    height: 36,
+    height: 38,
   },
   searchInput: {
     flex: 1,
@@ -1059,12 +1194,12 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 2,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
   },
   typePill: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 4,
+    borderRadius: 5,
   },
   typePillActive: {
     backgroundColor: Palette.primary,
@@ -1079,34 +1214,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* SECTION 3: Spreadsheet Preview Table Styles (Matching Reference Image 1 in Luvora Theme) */
+  /* SECTION 3: Spreadsheet Preview Table Styles */
   tableCard: {
     backgroundColor: Palette.surface,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: Palette.border,
+    borderColor: '#E2E8F0',
     overflow: 'hidden',
+    marginBottom: 24,
   },
   tableTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 11,
     backgroundColor: Palette.tint,
     borderBottomWidth: 1,
-    borderBottomColor: Palette.border,
+    borderBottomColor: '#E2E8F0',
   },
   tableTopBarTitle: {
     fontSize: Typography.fontSize.sm,
     fontWeight: '700',
     color: Palette.text,
-    fontFamily: Typography.fontFamily.serif,
-  },
-  tableRowCountText: {
-    fontSize: Typography.fontSize.caption,
-    fontWeight: '600',
-    color: Palette.textSecondary,
   },
   tableWrapper: {
     minWidth: 860,

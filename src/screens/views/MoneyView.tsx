@@ -11,13 +11,16 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Palette, Radius, Typography } from '../../constants/theme';
+import { Palette, Typography } from '../../constants/theme';
 import { useAppData } from '../../context/AppDataContext';
 import type { TransactionItem } from '../../types/appData';
 import { formatRupeeAmount, MONTHS_FULL, parseRupeeAmount } from '../../utils/finance';
 import PeriodicDetailsModal from '../../components/PeriodicDetailsModal';
+
+const ACCOUNTS_CARD_BG = require('../../../assets/accounts-card-bg.jpg');
 
 interface MoneyViewProps {
   onBack?: () => void;
@@ -135,32 +138,32 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
         }
       >
         <View style={styles.contentWrapper}>
-          {/* Top Header with Back button, Title, and Periodic Details button */}
+          {/* Top Header */}
           <View style={styles.headerRow}>
-            <View style={styles.headerLeft}>
-              <TouchableOpacity
-                style={styles.backButtonCircle}
-                onPress={onBack}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Feather name="chevron-left" size={Typography.iconSize.base} color={Palette.primary} />
-              </TouchableOpacity>
-              <Text style={styles.headerTitle}>Accounts</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.backButtonCircle}
+              onPress={onBack}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back to Home"
+            >
+              <Feather name="chevron-left" size={Typography.iconSize.header} color={Palette.primary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Accounts</Text>
+          </View>
 
-            <View style={styles.headerRightActions}>
-              {/* Periodic Details Header Button - without icon, bit more down */}
-              <TouchableOpacity
-                style={styles.periodicDetailsBtn}
-                onPress={() => setIsPeriodicModalOpen(true)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Periodic Details"
-              >
-                <Text style={styles.periodicDetailsBtnText}>Periodic Details</Text>
-              </TouchableOpacity>
-            </View>
+          {/* Periodic Details Action Row - between Accounts and This Month */}
+          <View style={styles.periodicActionRow}>
+            <TouchableOpacity
+              style={styles.periodicDetailsBtn}
+              onPress={() => setIsPeriodicModalOpen(true)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Periodic Details"
+            >
+              <Text style={styles.periodicDetailsBtnText}>Periodic Details</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Period Filter Pills */}
@@ -195,30 +198,44 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
           <View style={styles.summaryRow}>
             {/* Income Card */}
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Income</Text>
-              <Text style={styles.summaryValue}>{formatRupeeAmount(totalIncome)}</Text>
-              <Text style={styles.summarySub}>
-                {scope === 'This Month' ? currMonthLabel : 'All recorded'}
-              </Text>
-              <View style={styles.caramelIndicator} />
+              <Image
+                source={ACCOUNTS_CARD_BG}
+                resizeMode="cover"
+                style={styles.summaryCardBgImage}
+              />
+              <View style={styles.summaryCardContent}>
+                <Text style={styles.summaryLabel}>Income</Text>
+                <Text style={styles.summaryValue}>{formatRupeeAmount(totalIncome)}</Text>
+                <Text style={styles.summarySub}>
+                  {scope === 'This Month' ? currMonthLabel : 'All recorded'}
+                </Text>
+                <View style={styles.caramelIndicator} />
+              </View>
             </View>
 
             {/* Expenses Card */}
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryLabel}>Expenses</Text>
-              <Text style={[styles.summaryValue, { color: Palette.text }]}>
-                {formatRupeeAmount(totalExpenses)}
-              </Text>
-              <Text style={styles.summarySub}>
-                {scope === 'This Month' ? currMonthLabel : 'All recorded'}
-              </Text>
-              <View style={[styles.caramelIndicator, { backgroundColor: Palette.primary }]} />
+              <Image
+                source={ACCOUNTS_CARD_BG}
+                resizeMode="cover"
+                style={styles.summaryCardBgImage}
+              />
+              <View style={styles.summaryCardContent}>
+                <Text style={styles.summaryLabel}>Expenses</Text>
+                <Text style={[styles.summaryValue, { color: Palette.text }]}>
+                  {formatRupeeAmount(totalExpenses)}
+                </Text>
+                <Text style={styles.summarySub}>
+                  {scope === 'This Month' ? currMonthLabel : 'All recorded'}
+                </Text>
+                <View style={[styles.caramelIndicator, { backgroundColor: Palette.primary }]} />
+              </View>
             </View>
           </View>
 
           {/* Section: Income with Add button */}
           <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
-            <Text style={styles.sectionHeading}>Income ({incomeList.length})</Text>
+            <Text style={styles.sectionHeading}>Income </Text>
             <TouchableOpacity
               style={styles.addButton}
               activeOpacity={0.8}
@@ -268,7 +285,7 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
 
           {/* Section: Expenses with Add button */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeading}>Expenses ({expensesList.length})</Text>
+            <Text style={styles.sectionHeading}>Expenses </Text>
             <TouchableOpacity
               style={styles.addButton}
               activeOpacity={0.8}
@@ -322,7 +339,7 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
       <Modal
         visible={isAddExpenseVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setIsAddExpenseVisible(false)}
       >
         <KeyboardAvoidingView
@@ -398,7 +415,7 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
       <Modal
         visible={isAddIncomeVisible}
         transparent
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setIsAddIncomeVisible(false)}
       >
         <KeyboardAvoidingView
@@ -522,7 +539,7 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 18,
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 24,
     backgroundColor: Palette.background,
   },
@@ -533,25 +550,19 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 8,
   },
-  headerLeft: {
+  periodicActionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-  },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 22,
+    justifyContent: 'flex-end',
+    marginBottom: 12,
   },
   periodicDetailsBtn: {
     backgroundColor: Palette.primary,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 5,
-    marginTop: 14,
   },
   periodicDetailsBtnText: {
     fontSize: Typography.fontSize.sm,
@@ -566,14 +577,9 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Palette.text,
-    letterSpacing: 0.3,
-    ...Platform.select({
-      ios: { fontFamily: 'Georgia' },
-      android: { fontFamily: 'serif' },
-      default: { fontFamily: 'serif' },
-    }),
+    letterSpacing: -0.3,
   },
   scopePillRow: {
     flexDirection: 'row',
@@ -583,7 +589,7 @@ const styles = StyleSheet.create({
   scopeChip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -627,39 +633,54 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   summaryCard: {
     width: '48.5%',
     backgroundColor: Palette.surface,
-    borderRadius: Radius.md,
-    padding: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Palette.border,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  summaryCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  summaryCardContent: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   summaryLabel: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     color: Palette.textSecondary,
-    fontWeight: '500',
-    marginBottom: 6,
+    fontWeight: '600',
+    marginBottom: 3,
   },
   summaryValue: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: Typography.fontSize.lg,
     fontWeight: '800',
     color: Palette.accentText,
-    marginBottom: 4,
+    marginBottom: 2,
+    lineHeight: 22,
   },
   summarySub: {
     fontSize: Typography.fontSize.caption,
     color: Palette.textSecondary,
+    lineHeight: 12,
   },
   caramelIndicator: {
-    height: 3,
+    height: 2.5,
     backgroundColor: Palette.primary,
-    borderRadius: Radius.xs,
-    marginTop: 10,
-    width: '40%',
+    borderRadius: 2,
+    marginTop: 6,
+    width: '35%',
   },
   sectionHeading: {
     fontSize: Typography.fontSize.lg,
@@ -678,7 +699,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.primary,
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
   },
   addButtonText: {
     color: Palette.onPrimary,
@@ -687,7 +708,7 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     backgroundColor: Palette.surface,
-    borderRadius: Radius.md,
+    borderRadius: 5,
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderWidth: 1,
@@ -740,7 +761,9 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   modalBackdrop: {
     position: 'absolute',
@@ -751,14 +774,15 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.backdrop,
   },
   modalContent: {
+    width: '100%',
+    maxWidth: 420,
     backgroundColor: Palette.surface,
-    borderTopLeftRadius: Radius.md,
-    borderTopRightRadius: Radius.md,
-    borderTopWidth: 1,
+    borderRadius: 5,
+    borderWidth: 1,
     borderColor: Palette.border,
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 36,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -773,7 +797,7 @@ const styles = StyleSheet.create({
   },
   modalErrorBanner: {
     backgroundColor: Palette.status.overdue.bg,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 10,
@@ -794,7 +818,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: Typography.fontSize.base,
@@ -802,7 +826,7 @@ const styles = StyleSheet.create({
   },
   saveExpenseBtn: {
     backgroundColor: Palette.primary,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 18,
@@ -822,7 +846,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: 'center',
     backgroundColor: Palette.surface,
-    borderRadius: Radius.md,
+    borderRadius: 5,
     padding: 20,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -847,7 +871,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingVertical: 11,
     alignItems: 'center',
   },
@@ -859,7 +883,7 @@ const styles = StyleSheet.create({
   confirmDeleteBtn: {
     flex: 1,
     backgroundColor: Palette.status.overdue.text,
-    borderRadius: Radius.sm,
+    borderRadius: 5,
     paddingVertical: 11,
     alignItems: 'center',
   },

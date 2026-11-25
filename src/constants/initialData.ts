@@ -613,7 +613,7 @@ export function createInitialRentMeta(now: Date = new Date()): Record<string, Ro
       dueDate: dueDateLabel,
       paymentCycle: 'Monthly',
       currentStatus: 'Due',
-      statusBadgeText: `Due ${currMonthShort} 1`,
+      statusBadgeText: 'Due',
       history: [
         {
           id: 'h12',

@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../constants/theme';
 import { AppDataProvider, useAppData } from '../context/AppDataContext';
+import { RoomsBedIcon, ReportsBarIcon, AccountsWalletIcon } from '../components/CustomIcons';
 import HamburgerDrawer, { DrawerMenuKey } from '../components/HamburgerDrawer';
 import DashboardView from './views/DashboardView';
 import RoomsView from './views/RoomsView';
@@ -26,6 +27,8 @@ import SettingsView from './views/SettingsView';
 import ProfileView from './views/AccountView';
 import NotificationsView from './views/NotificationsView';
 import StaffView from './views/StaffView';
+import RequestsView from './views/RequestsView';
+import PolicyView from './views/PolicyView';
 
 export type ActivePage =
   | 'Home'
@@ -36,9 +39,11 @@ export type ActivePage =
   | 'Residents'
   | 'Staff'
   | 'Reports'
+  | 'Policy'
   | 'Settings'
   | 'Profile'
-  | 'Notifications';
+  | 'Notifications'
+  | 'Requests';
 
 interface OwnerDashboardProps {
   uid: string;
@@ -102,6 +107,9 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
 
   const handleMenuSelect = (key: DrawerMenuKey) => {
     switch (key) {
+      case 'Requests':
+        setActivePage('Requests');
+        break;
       case 'Deposits':
         setActivePage('Deposits');
         break;
@@ -110,6 +118,9 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
         break;
       case 'Reports':
         setActivePage('Reports');
+        break;
+      case 'Policy':
+        setActivePage('Policy');
         break;
       case 'Settings':
         setActivePage('Settings');
@@ -190,6 +201,15 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
             onBack={() => setActivePage('Home')}
           />
         );
+      case 'Requests':
+        return (
+          <RequestsView
+            initialRequestId={selectedNoticeId}
+            onBack={() => setActivePage('Home')}
+          />
+        );
+      case 'Policy':
+        return <PolicyView onBack={() => setActivePage('Home')} />;
       case 'Home':
       default:
         return (
@@ -204,6 +224,9 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
               else if (page === 'Notifications') {
                 setSelectedNoticeId(noticeId);
                 setActivePage('Notifications');
+              } else if (page === 'Requests') {
+                setSelectedNoticeId(noticeId);
+                setActivePage('Requests');
               }
             }}
           />
@@ -225,7 +248,7 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
           accessibilityRole="button"
           accessibilityLabel="Open menu"
         >
-          <Feather name="menu" size={Typography.iconSize.base} color={Palette.onPrimary} />
+          <Feather name="menu" size={Typography.iconSize.header} color={Palette.onPrimary} />
         </TouchableOpacity>
 
         {/* Luvora Wordmark */}
@@ -245,7 +268,7 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
             setActivePage('Notifications');
           }}
         >
-          <Feather name="bell" size={Typography.iconSize.base} color={Palette.onPrimary} />
+          <Feather name="bell" size={Typography.iconSize.header} color={Palette.onPrimary} />
           {unreadCount > 0 ? <View style={styles.unreadDot} /> : null}
         </TouchableOpacity>
       </View>
@@ -290,11 +313,28 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
                 >
-                  <Feather
-                    name={tab.icon}
-                    size={Typography.iconSize.base}
-                    color={isActive ? Palette.surface : Palette.textSecondary}
-                  />
+                  {tab.key === 'Rooms' ? (
+                    <RoomsBedIcon
+                      size={21}
+                      color={isActive ? Palette.surface : Palette.textSecondary}
+                    />
+                  ) : tab.key === 'Reports' ? (
+                    <ReportsBarIcon
+                      size={Typography.iconSize.footer}
+                      color={isActive ? Palette.surface : Palette.textSecondary}
+                    />
+                  ) : tab.key === 'Accounts' ? (
+                    <AccountsWalletIcon
+                      size={Typography.iconSize.footer}
+                      color={isActive ? Palette.surface : Palette.textSecondary}
+                    />
+                  ) : (
+                    <Feather
+                      name={tab.icon}
+                      size={Typography.iconSize.footer}
+                      color={isActive ? Palette.surface : Palette.textSecondary}
+                    />
+                  )}
                   <Text
                     style={[
                       styles.navLabel,
@@ -370,7 +410,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Palette.onPrimary,
     letterSpacing: 0.5,
-    fontFamily: Typography.fontFamily.serif,
   },
   syncErrorBar: {
     flexDirection: 'row',

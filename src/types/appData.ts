@@ -191,6 +191,7 @@ export interface CustomerServiceRequest {
   status: ServiceRequestStatus;
   createdAt: number;
   timeLabel: string;
+  roomNumber?: string;
   assignedTo?: string;
   ownerNote?: string;
 }
@@ -240,6 +241,29 @@ export interface CustomerOwnerContact {
   upiId: string;
 }
 
+export interface PropertyRule {
+  id: string;
+  category: 'General' | 'Security' | 'Visitors' | 'Cleanliness' | 'Quiet Hours';
+  title: string;
+  summary: string;
+  details?: string;
+  timing?: string;
+  enforcementLevel?: 'Mandatory' | 'Standard' | 'Guideline';
+  imageUri?: string;
+}
+
+export interface ResidentDocument {
+  id: string;
+  title: string;
+  category: 'Agreement' | 'Identification' | 'Receipt' | 'Verification' | 'Other';
+  fileType: 'PDF' | 'DOC' | 'IMG';
+  fileSize: string;
+  status: 'Verified' | 'Active' | 'Pending' | 'Uploaded';
+  uploadedDate: string;
+  referenceNumber?: string;
+  description?: string;
+}
+
 export interface CustomerWorkspaceData {
   profile: CustomerProfile;
   room: RoomItem;
@@ -249,5 +273,7 @@ export interface CustomerWorkspaceData {
   notices: CustomerNotice[];
   ownerContact: CustomerOwnerContact;
   leaseInfo: CustomerLeaseInfo;
+  rules?: PropertyRule[];
+  documents?: ResidentDocument[];
 }
 

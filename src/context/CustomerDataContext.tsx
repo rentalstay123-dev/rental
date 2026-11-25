@@ -1,6 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { createInitialCustomerData } from '../constants/customerInitialData';
+import {
+  createInitialCustomerData,
+  createInitialPropertyRules,
+  createInitialResidentDocuments,
+} from '../constants/customerInitialData';
 import {
   ensureCustomerWorkspaceInitialized,
   saveCustomerWorkspace,
@@ -14,6 +18,7 @@ import type {
   DepositPaymentMode,
   PaymentMode,
   PaymentRecord,
+  ResidentDocument,
   RoomDepositOverride,
   ServiceRequestPriority,
   ServiceRequestStatus,
@@ -36,6 +41,14 @@ export interface CreateServiceRequestInput {
   title: string;
   description: string;
   priority: ServiceRequestPriority;
+  roomNumber?: string;
+}
+
+export interface AddDocumentInput {
+  title: string;
+  category: ResidentDocument['category'];
+  fileType?: ResidentDocument['fileType'];
+  description?: string;
 }
 
 interface CustomerDataContextValue {
@@ -56,6 +69,7 @@ interface CustomerDataContextValue {
   clearAllNotices: () => Promise<void>;
   updateCustomerProfile: (patch: Partial<CustomerProfile>) => Promise<void>;
   switchRoomSample: (roomNumber: string) => Promise<void>;
+  addCustomerDocument: (input: AddDocumentInput) => Promise<ResidentDocument>;
 }
 
 const CustomerDataContext = createContext<CustomerDataContextValue | null>(null);
@@ -145,6 +159,12 @@ export function CustomerDataProvider({
               await AsyncStorage.setItem(getStorageKey(uid), JSON.stringify(parsed)).catch(() => {});
               await AsyncStorage.setItem(resetKey, 'true').catch(() => {});
             }
+            if (!parsed.rules || parsed.rules.length === 0) {
+              parsed.rules = createInitialPropertyRules();
+            }
+            if (!parsed.documents || parsed.documents.length === 0) {
+              parsed.documents = createInitialResidentDocuments(parsed.room?.roomNumber);
+            }
             setData(parsed);
           }
         }
@@ -181,6 +201,12 @@ export function CustomerDataProvider({
             await AsyncStorage.setItem(getStorageKey(uid), JSON.stringify(initialized)).catch(() => {});
             await AsyncStorage.setItem(resetKey, 'true').catch(() => {});
           }
+          if (!initialized.rules || initialized.rules.length === 0) {
+            initialized.rules = createInitialPropertyRules();
+          }
+          if (!initialized.documents || initialized.documents.length === 0) {
+            initialized.documents = createInitialResidentDocuments(initialized.room?.roomNumber);
+          }
           setData(initialized);
         }
       } catch (err) {
@@ -198,6 +224,12 @@ export function CustomerDataProvider({
         { email: userEmail, fullName: userName },
         (remote) => {
           if (!isMounted) return;
+          if (!remote.rules || remote.rules.length === 0) {
+            remote.rules = createInitialPropertyRules();
+          }
+          if (!remote.documents || remote.documents.length === 0) {
+            remote.documents = createInitialResidentDocuments(remote.room?.roomNumber);
+          }
           setData(remote);
           void AsyncStorage.setItem(getStorageKey(uid), JSON.stringify(remote)).catch(() => {});
         },
@@ -406,9 +438,11 @@ export function CustomerDataProvider({
       title,
       description,
       priority,
+      roomNumber,
     }: CreateServiceRequestInput): Promise<CustomerServiceRequest> => {
       const current = dataRef.current;
       const now = new Date();
+      const targetRoom = roomNumber?.trim() || current.room.roomNumber;
       const newReq: CustomerServiceRequest = {
         id: `creq-${now.getTime()}`,
         category: category.trim(),
@@ -418,6 +452,7 @@ export function CustomerDataProvider({
         status: 'Open',
         createdAt: now.getTime(),
         timeLabel: 'Just now',
+        roomNumber: targetRoom,
         ownerNote: 'Submitted to property manager for review.',
       };
 
@@ -429,7 +464,7 @@ export function CustomerDataProvider({
           ? 'Maintenance'
           : 'Property',
         title: `Request: ${title.trim()}`,
-        message: `Your request (${category.trim()} · ${priority}) has been delivered for Room ${current.room.roomNumber}.`,
+        message: `Your request (${category.trim()} · ${priority}) has been delivered for ${targetRoom}.`,
         timeLabel: 'Just now',
         createdAt: now.getTime(),
         isRead: false,
@@ -559,6 +594,33 @@ export function CustomerDataProvider({
     [persistData]
   );
 
+  const addCustomerDocument = useCallback(
+    async (input: AddDocumentInput): Promise<ResidentDocument> => {
+      const current = dataRef.current;
+      const roomNum = current.room?.roomNumber || 'Room 102';
+      const cleanRef = `DOC-${roomNum.replace(/\s+/g, '')}-${Date.now().toString().slice(-4)}`;
+      const newDoc: ResidentDocument = {
+        id: `doc-${Date.now()}`,
+        title: input.title.trim(),
+        category: input.category,
+        fileType: input.fileType || 'PDF',
+        fileSize: '1.2 MB',
+        status: 'Uploaded',
+        uploadedDate: formatShortDate(new Date()),
+        referenceNumber: cleanRef,
+        description: input.description?.trim() || 'Uploaded resident document.',
+      };
+      const next: CustomerWorkspaceData = {
+        ...current,
+        documents: [newDoc, ...(current.documents ?? [])],
+      };
+      setData(next);
+      await persistData(next);
+      return newDoc;
+    },
+    [persistData]
+  );
+
   const value = useMemo<CustomerDataContextValue>(
     () => ({
       uid,
@@ -578,6 +640,7 @@ export function CustomerDataProvider({
       clearAllNotices,
       updateCustomerProfile,
       switchRoomSample,
+      addCustomerDocument,
     }),
     [
       uid,
@@ -597,6 +660,7 @@ export function CustomerDataProvider({
       clearAllNotices,
       updateCustomerProfile,
       switchRoomSample,
+      addCustomerDocument,
     ]
   );
 

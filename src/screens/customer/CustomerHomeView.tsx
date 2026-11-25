@@ -19,6 +19,7 @@ export type CustomerPageKey =
   | 'Payments'
   | 'Requests'
   | 'Notices'
+  | 'RulesAndDocs'
   | 'Profile';
 
 interface CustomerHomeViewProps {
@@ -36,7 +37,7 @@ function getRentStatusColors(status: string) {
 
 export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewProps) {
   const { data, refreshWorkspace } = useCustomerData();
-  const { profile, room, rentMeta, deposit, notices, ownerContact, leaseInfo } = data;
+  const { profile, room, rentMeta, deposit, notices, requests, ownerContact, leaseInfo } = data;
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = React.useCallback(async () => {
@@ -64,11 +65,12 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
 
   const unreadNotices = notices.filter((n) => !n.isRead);
   const latestNotice = notices[0];
+  const latestRequest = requests[0];
 
   const handleCallOwner = () => {
     const digits = ownerContact.phone.replace(/[^\d+]/g, '');
     if (!digits) return;
-    void Linking.openURL(`tel:${digits}`).catch(() => {});
+    void Linking.openURL(`tel:${digits}`).catch(() => { });
   };
 
   return (
@@ -168,7 +170,7 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
                 style={[
                   styles.metricSubtext,
                   deposit.status !== 'Held' &&
-                    deposit.status !== 'Paid' && { color: Palette.status.due.text, fontWeight: '700' },
+                  deposit.status !== 'Paid' && { color: Palette.status.due.text, fontWeight: '700' },
                 ]}
               >
                 {deposit.status === 'Held' || deposit.status === 'Paid'
@@ -358,6 +360,124 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
               <Text style={styles.callChipText}>Call</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Section: Service Requests */}
+        <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
+          <Text style={styles.sectionTitle}>Requests</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => onNavigatePage?.('Requests')}
+          >
+            <Text style={styles.actionLinkText}>
+              {requests.length > 0 ? `${requests.length} total` : 'View all'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cardContainer}>
+          {latestRequest ? (
+            <>
+              <TouchableOpacity
+                style={styles.compactRow}
+                activeOpacity={0.7}
+                onPress={() => onNavigatePage?.('Requests')}
+              >
+                <View style={styles.noticeIconCircle}>
+                  <Feather name="tool" size={16} color={Palette.primary} />
+                </View>
+                <View style={styles.listLeftCol}>
+                  <View style={styles.titleBadgeRow}>
+                    <Text style={styles.compactTitle} numberOfLines={1}>
+                      {latestRequest.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.inlineStatusText,
+                        {
+                          color:
+                            latestRequest.status === 'Resolved'
+                              ? Palette.status.paid.text
+                              : latestRequest.status === 'In Progress'
+                                ? Palette.primary
+                                : Palette.status.due.text,
+                        },
+                      ]}
+                    >
+                      {latestRequest.status}
+                    </Text>
+                  </View>
+                  <Text style={styles.rowSub} numberOfLines={1}>
+                    {latestRequest.roomNumber || room.roomNumber} · {latestRequest.category} · {latestRequest.timeLabel}
+                  </Text>
+                </View>
+                <Feather
+                  name="chevron-right"
+                  size={Typography.iconSize.sm}
+                  color={Palette.primary}
+                />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+            </>
+          ) : null}
+
+          <TouchableOpacity
+            style={styles.supportRow}
+            activeOpacity={0.7}
+            onPress={() => onNavigatePage?.('Requests', { openNewRequestModal: true })}
+          >
+            <View style={styles.noticeIconCircle}>
+              <Feather name="plus-circle" size={16} color={Palette.primary} />
+            </View>
+            <View style={styles.listLeftCol}>
+              <Text style={styles.compactTitle} numberOfLines={1}>
+                Need Help or Maintenance?
+              </Text>
+              <Text style={styles.rowSub} numberOfLines={1}>
+                Tap to submit a new service request
+              </Text>
+            </View>
+            <View style={styles.callChip}>
+              <Feather name="plus" size={13} color={Palette.primary} />
+              <Text style={styles.callChipText}>New</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Section: Policy */}
+        <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
+          <Text style={styles.sectionTitle}>Policy</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => onNavigatePage?.('RulesAndDocs')}
+          >
+            <Text style={styles.actionLinkText}>View all</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cardContainer}>
+          <TouchableOpacity
+            style={styles.compactRow}
+            activeOpacity={0.7}
+            onPress={() => onNavigatePage?.('RulesAndDocs')}
+          >
+            <View style={styles.noticeIconCircle}>
+              <Feather name="file-text" size={16} color={Palette.primary} />
+            </View>
+            <View style={styles.listLeftCol}>
+              <Text style={styles.compactTitle} numberOfLines={1}>
+                Policy & House Rules
+              </Text>
+              <Text style={styles.rowSub} numberOfLines={1}>
+                {room.roomNumber} · Quiet hours, visitor policy & lease deed
+              </Text>
+            </View>
+            <Feather
+              name="chevron-right"
+              size={Typography.iconSize.sm}
+              color={Palette.primary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
     </ScrollView>
@@ -571,12 +691,14 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   viewAllText: {
-    fontSize: Typography.fontSize.base,
+    fontSize: Typography.fontSize.viewAll,
     fontWeight: '700',
     color: Palette.primary,
+    textDecorationLine: 'underline',
+    textDecorationColor: Palette.primary,
   },
   actionLinkText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: Typography.fontSize.viewAll,
     fontWeight: '700',
     color: Palette.primary,
   },
