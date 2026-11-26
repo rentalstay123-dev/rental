@@ -119,17 +119,7 @@ export default function PolicyView({ onBack }: PolicyViewProps) {
           }
         } else {
           // Default initial record
-          const initialAgr: RoomAgreementRecord[] = [
-            {
-              id: 'agr-sample-1',
-              roomNumber: 'Room 102',
-              residentName: 'Priya Sharma',
-              fileName: 'Residential_Lease_Agreement_Room102.pdf',
-              fileSize: '1.8 MB',
-              uploadedAt: '01 Mar 2026',
-              status: 'Active',
-            },
-          ];
+          const initialAgr: RoomAgreementRecord[] = [];
           setAgreements(initialAgr);
           await AsyncStorage.setItem(STORAGE_KEY_ROOM_AGREEMENTS, JSON.stringify(initialAgr));
         }
@@ -168,13 +158,13 @@ export default function PolicyView({ onBack }: PolicyViewProps) {
   }, [refreshWorkspace]);
 
   // Derived owner info
-  const propertyName = profile.propertyName || 'Sunrise Enclave';
-  const ownerName = profile.fullName || 'Rajesh Kumar';
-  const ownerPhone = profile.phone || '+91 98765 43210';
-  const ownerEmail = profile.email || 'owner@luvora.com';
+  const propertyName = profile.propertyName || 'My Property';
+  const ownerName = profile.fullName || 'Property Owner';
+  const ownerPhone = profile.phone || '';
+  const ownerEmail = profile.email || '';
   const paymentDetails = profile.bankName
-    ? `${profile.bankName} · A/C ${profile.accountNumber || '••••9821'}`
-    : 'HDFC Bank · UPI: luvora.sunrise@hdfcbank';
+    ? `${profile.bankName} · A/C ${profile.accountNumber || ''}`
+    : '';
 
   const defaultRent = useMemo(() => {
     if (rooms.length > 0 && rooms[0]?.monthlyRent) {
@@ -1203,7 +1193,7 @@ const styles = StyleSheet.create({
   statusToast: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E5F0DF',
+    backgroundColor: Palette.status.paid.bg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 5,
@@ -1212,7 +1202,7 @@ const styles = StyleSheet.create({
   statusToastText: {
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-    color: '#315B32',
+    color: Palette.status.paid.text,
   },
   tabFilterRow: {
     flexDirection: 'row',
@@ -1355,7 +1345,7 @@ const styles = StyleSheet.create({
   },
   pdfPickedSize: {
     fontSize: Typography.fontSize.xs,
-    color: '#315B32',
+    color: Palette.status.paid.text,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -1629,7 +1619,7 @@ const styles = StyleSheet.create({
   imageTapHintText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#F8F5FC',
+    color: Palette.onPrimary,
   },
   ruleDetailsBox: {
     marginTop: 8,
@@ -1855,7 +1845,7 @@ const styles = StyleSheet.create({
   },
   roomPickerItemDisabled: {
     opacity: 0.65,
-    backgroundColor: '#F9F7FC',
+    backgroundColor: Palette.surface,
   },
   roomPickerItemTextDisabled: {
     fontSize: Typography.fontSize.base,
@@ -1918,7 +1908,7 @@ const styles = StyleSheet.create({
   imageViewerTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#F8F5FC',
+    color: Palette.onPrimary,
   },
   imageViewerCloseBtn: {
     width: 38,

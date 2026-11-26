@@ -177,7 +177,14 @@ export interface StaffMember {
   notes?: string;
 }
 
-export type UserRole = 'owner' | 'customer';
+export type UserRole = 'owner' | 'customer' | 'admin';
+
+export function normalizeUserRole(role?: string | null): 'owner' | 'customer' {
+  if (!role) return 'owner';
+  const lower = role.toLowerCase().trim();
+  if (lower === 'customer' || lower === 'resident' || lower === 'tenant') return 'customer';
+  return 'owner';
+}
 
 export type ServiceRequestStatus = 'Open' | 'In Progress' | 'Resolved';
 export type ServiceRequestPriority = 'Normal' | 'Urgent';

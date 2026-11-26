@@ -65,6 +65,7 @@ export default function CustomerRequestsView({
   const fixedRoomNumber = profile.roomNumber?.trim() || room.roomNumber || 'Room 102';
 
   const [filter, setFilter] = useState<RequestFilter>('All');
+  const [searchQuery, setSearchQuery] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [bannerText, setBannerText] = useState<string | null>(null);
 
@@ -122,9 +123,18 @@ export default function CustomerRequestsView({
     }
   };
 
-  const filteredRequests = requests.filter((req) =>
-    filter === 'All' ? true : req.status === filter
-  );
+  const filteredRequests = requests.filter((req) => {
+    const matchesFilter = filter === 'All' ? true : req.status === filter;
+    if (!matchesFilter) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      req.title.toLowerCase().includes(q) ||
+      req.category.toLowerCase().includes(q) ||
+      req.description.toLowerCase().includes(q) ||
+      (req.roomNumber && req.roomNumber.toLowerCase().includes(q))
+    );
+  });
 
   return (
     <View style={styles.outerScreen}>
@@ -163,11 +173,13 @@ export default function CustomerRequestsView({
             </View>
 
             <TouchableOpacity
-              style={styles.addBtn}
+              style={styles.requestHeaderButton}
               onPress={openNewModal}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Create Request"
             >
-              <Text style={styles.addBtnText}>New</Text>
+              <Text style={styles.requestHeaderButtonText}>Request</Text>
             </TouchableOpacity>
           </View>
 
@@ -179,6 +191,29 @@ export default function CustomerRequestsView({
               </TouchableOpacity>
             </View>
           ) : null}
+
+          {/* Search Bar matching Admin style */}
+          <View style={styles.searchBarBox}>
+            <Feather name="search" size={Typography.iconSize.sm} color={Palette.primary} />
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search by title, category, or room..."
+              placeholderTextColor={Palette.textMuted}
+              accessibilityLabel="Search requests"
+            />
+            {searchQuery.length > 0 ? (
+              <TouchableOpacity
+                onPress={() => setSearchQuery('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Clear search"
+              >
+                <Feather name="x" size={Typography.iconSize.sm} color={Palette.textSecondary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
 
           {/* Filter Chips */}
           <ScrollView
@@ -553,23 +588,41 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: 20,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
   },
-  addBtn: {
+  requestHeaderButton: {
     backgroundColor: Palette.primary,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addBtnText: {
-    color: Palette.onPrimary,
-    fontSize: Typography.fontSize.sm,
+  requestHeaderButtonText: {
+    fontSize: 11,
     fontWeight: '700',
+    color: Palette.onPrimary,
+  },
+  searchBarBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: Typography.fontSize.sm,
+    color: Palette.text,
+    marginLeft: 8,
+    paddingVertical: 0,
   },
   bannerCard: {
     flexDirection: 'row',
@@ -603,7 +656,7 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 15,
     paddingVertical: 7,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,

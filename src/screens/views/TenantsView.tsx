@@ -95,7 +95,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
       id: `m-${Date.now()}`,
       name: newName.trim(),
       role: 'Primary Resident',
-      phone: newPhone.trim() || '+91 98000 00000',
+      phone: newPhone.trim(),
     };
 
     if (existingRoom) {
@@ -328,7 +328,7 @@ export default function TenantsView({ onBack }: TenantsViewProps) {
               <Text style={styles.inputLabel}>Phone Number</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. +91 98765 00000"
+                placeholder="Enter phone number"
                 placeholderTextColor={Palette.textMuted}
                 keyboardType="phone-pad"
                 value={newPhone}

@@ -13,17 +13,14 @@ import {
   Platform,
   TextInput,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-  updateProfile,
-} from 'firebase/auth';
-import { auth, getFirebaseAuthErrorMessage } from '../../config/firebase';
+import { supabase, getSupabaseAuthErrorMessage } from '../../config/supabase';
 import { Palette, Typography } from '../../constants/theme';
 import { useCustomerData } from '../../context/CustomerDataContext';
+
+const ACCOUNTS_CARD_BG = require('../../../assets/accounts-card-bg.jpg');
 
 interface CustomerProfileViewProps {
   onBack?: () => void;
@@ -142,13 +139,12 @@ export default function CustomerProfileView({
       return;
     }
     const nextName = draftName.trim();
-    if (auth.currentUser && nextName !== auth.currentUser.displayName) {
-      try {
-        await updateProfile(auth.currentUser, { displayName: nextName });
-      } catch (error) {
-        setModalError(getFirebaseAuthErrorMessage(error, 'Could not update profile name.'));
-        return;
-      }
+    try {
+      await supabase.auth.updateUser({
+        data: { displayName: nextName, full_name: nextName },
+      });
+    } catch {
+      // Non-fatal if offline
     }
     setModalError(null);
     setShowEditProfile(false);
@@ -182,21 +178,25 @@ export default function CustomerProfileView({
       return;
     }
 
-    const user = auth.currentUser;
-    if (!user || !user.email) {
-      setModalError('No signed-in email account found.');
-      return;
-    }
-
     setModalError(null);
     setIsUpdatingPassword(true);
     try {
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, newPassword);
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+      if (email) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email,
+          password: currentPassword,
+        });
+        if (signInErr) throw signInErr;
+      }
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateErr) throw updateErr;
       setShowChangePassword(false);
     } catch (error) {
-      setModalError(getFirebaseAuthErrorMessage(error, 'Could not update password.'));
+      setModalError(getSupabaseAuthErrorMessage(error, 'Could not update password.'));
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -262,25 +262,32 @@ export default function CustomerProfileView({
 
           {/* Identity Summary Card */}
           <View style={styles.heroCard}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitials}>{getInitials(profile.fullName)}</Text>
-            </View>
-
-            <View style={styles.heroTextCol}>
-              <View style={styles.heroNameRow}>
-                <Text style={styles.heroName} numberOfLines={1}>
-                  {profile.fullName}
-                </Text>
-                <View style={styles.rolePill}>
-                  <Text style={styles.rolePillText}>Resident</Text>
-                </View>
+            <Image
+              source={ACCOUNTS_CARD_BG}
+              style={styles.heroCardBgImage}
+              resizeMode="stretch"
+            />
+            <View style={styles.heroCardContent}>
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitials}>{getInitials(profile.fullName)}</Text>
               </View>
-              <Text style={styles.heroSub} numberOfLines={1}>
-                {room.roomNumber} · {profile.propertyName}
-              </Text>
-              <Text style={styles.heroEmail} numberOfLines={1}>
-                {profile.email}
-              </Text>
+
+              <View style={styles.heroTextCol}>
+                <View style={styles.heroNameRow}>
+                  <Text style={styles.heroName} numberOfLines={1}>
+                    {profile.fullName}
+                  </Text>
+                  <View style={styles.rolePill}>
+                    <Text style={styles.rolePillText}>Resident</Text>
+                  </View>
+                </View>
+                <Text style={styles.heroSub} numberOfLines={1}>
+                  {room.roomNumber} · {profile.propertyName}
+                </Text>
+                <Text style={styles.heroEmail} numberOfLines={1}>
+                  {profile.email}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -398,7 +405,7 @@ export default function CustomerProfileView({
             if (modalError) setModalError(null);
           }}
           keyboardType="phone-pad"
-          placeholder="+91 98765 43210"
+          placeholder="Enter phone number"
           placeholderTextColor={Palette.textMuted}
         />
 
@@ -407,7 +414,7 @@ export default function CustomerProfileView({
           style={styles.inputField}
           value={draftEmergencyName}
           onChangeText={setDraftEmergencyName}
-          placeholder="Contact person"
+          placeholder="Enter emergency contact name"
           placeholderTextColor={Palette.textMuted}
         />
 
@@ -417,7 +424,7 @@ export default function CustomerProfileView({
           value={draftEmergencyPhone}
           onChangeText={setDraftEmergencyPhone}
           keyboardType="phone-pad"
-          placeholder="+91 98765 67890"
+          placeholder="Enter emergency contact phone"
           placeholderTextColor={Palette.textMuted}
         />
 
@@ -545,20 +552,34 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: 20,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
   },
   heroCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: Palette.surface,
-    borderRadius: 5,
-    padding: 16,
+    borderRadius: 8,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: Palette.border,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  heroCardContent: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   avatarCircle: {
     width: 56,

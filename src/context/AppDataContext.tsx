@@ -15,7 +15,9 @@ import {
   deleteStaffMember,
   deleteTransaction,
   ensureUserWorkspaceInitialized,
+  recordPaymentBatch,
   saveOwnerProfile,
+  saveRoomsFullList,
   saveWorkspaceSettings,
   subscribeUserWorkspace,
   upsertDepositOverride,
@@ -25,7 +27,7 @@ import {
   upsertRoomsBatch,
   upsertStaffMember,
   upsertTransaction,
-} from '../services/firestoreService';
+} from '../services/supabaseService';
 import type {
   NotificationItem,
   OwnerProfile,
@@ -140,14 +142,14 @@ interface AppDataProviderProps {
 
 function getFriendlySyncError(error: unknown): string {
   const code = (error as { code?: string })?.code;
-  if (code === 'permission-denied') {
-    return 'Firestore permission denied. Update Firestore Security Rules in Firebase Console to sync across devices.';
+  if (code === 'permission-denied' || code === '42501') {
+    return 'Supabase permission denied. Check your Row Level Security (RLS) policies.';
   }
-  if (code === 'unavailable') {
-    return 'Offline or Firestore unreachable. Changes are kept locally until reconnected.';
+  if (code === 'unavailable' || code === 'PGRST205') {
+    return 'Supabase tables not configured yet. Changes are stored locally.';
   }
   const msg = (error as { message?: string })?.message;
-  return msg ? `Cloud sync issue: ${msg}` : 'Could not sync with Firestore.';
+  return msg ? `Cloud sync issue: ${msg}` : 'Could not sync with Supabase.';
 }
 
 export function AppDataProvider({ uid, userEmail, userName, children }: AppDataProviderProps) {
@@ -157,18 +159,12 @@ export function AppDataProvider({ uid, userEmail, userName, children }: AppDataP
     fullName: userName || DEFAULT_OWNER_PROFILE.fullName,
   }));
   const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
-  const [rooms, setRooms] = useState<RoomItem[]>(INITIAL_ROOMS);
-  const [rentMetaByRoomId, setRentMetaByRoomId] = useState<Record<string, RoomRentMeta>>(() =>
-    createInitialRentMeta()
-  );
+  const [rooms, setRooms] = useState<RoomItem[]>([]);
+  const [rentMetaByRoomId, setRentMetaByRoomId] = useState<Record<string, RoomRentMeta>>({});
   const [depositOverrides, setDepositOverrides] = useState<Record<string, RoomDepositOverride>>({});
-  const [transactions, setTransactions] = useState<TransactionItem[]>(() =>
-    createInitialTransactions()
-  );
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() =>
-    createInitialNotifications()
-  );
-  const [staff, setStaff] = useState<StaffMember[]>(INITIAL_STAFF);
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(() => !uid.startsWith('local-'));
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -421,23 +417,7 @@ export function AppDataProvider({ uid, userEmail, userName, children }: AppDataP
       roomsRef.current = sorted;
       setRooms(sorted);
 
-      const prevById = new Map(prevRooms.map((r) => [r.id, r]));
-      const nextById = new Map(nextRooms.map((r) => [r.id, r]));
-
-      const removed = prevRooms.filter((r) => !nextById.has(r.id));
-      const changedOrAdded = nextRooms.filter((r) => {
-        const prev = prevById.get(r.id);
-        return !prev || JSON.stringify(prev) !== JSON.stringify(r);
-      });
-
-      void persistSafe(async () => {
-        if (changedOrAdded.length > 0) {
-          await upsertRoomsBatch(uid, changedOrAdded);
-        }
-        for (const r of removed) {
-          await deleteRoomAndRelated(uid, r.id, r.roomNumber);
-        }
-      });
+      void persistSafe(() => saveRoomsFullList(uid, sorted));
     },
     [uid, persistSafe]
   );
@@ -505,14 +485,9 @@ export function AppDataProvider({ uid, userEmail, userName, children }: AppDataP
       };
       setNotifications((prev) => [paymentNotice, ...prev]);
 
-      await persistSafe(async () => {
-        await upsertRentMeta(uid, nextMeta);
-        if (updatedRoom) {
-          await upsertRoom(uid, updatedRoom);
-        }
-        await upsertTransaction(uid, tx);
-        await upsertNotification(uid, paymentNotice);
-      });
+      await persistSafe(() =>
+        recordPaymentBatch(uid, nextMeta, updatedRoom, tx, paymentNotice)
+      );
     },
     [uid, persistSafe]
   );

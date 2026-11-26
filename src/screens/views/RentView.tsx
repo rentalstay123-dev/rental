@@ -62,13 +62,13 @@ function getStatusDisplay(room: RoomRentDetail) {
   if (room.currentStatus === 'Paid') {
     return {
       text: 'Paid',
-      color: '#06402B',
+      color: Palette.status.paid.text,
     };
   }
   if (room.currentStatus === 'Overdue') {
     return {
       text: 'Overdue',
-      color: '#c41e3a',
+      color: Palette.status.overdue.text,
     };
   }
   if (room.dueDate) {
@@ -76,13 +76,13 @@ function getStatusDisplay(room: RoomRentDetail) {
     if (m) {
       return {
         text: `Due ${m[2]} ${m[1]}`,
-        color: '#A0522D',
+        color: Palette.status.due.text,
       };
     }
   }
   return {
     text: 'Due',
-    color: '#A0522D',
+    color: Palette.status.due.text,
   };
 }
 
@@ -1345,27 +1345,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   summaryCardTotal: {
-    backgroundColor: '#F3ECFB',
-    borderColor: '#E3D5F8',
+    backgroundColor: Palette.iconBg,
+    borderColor: Palette.border,
   },
   summaryCardActiveTotal: {
-    borderColor: '#4B0082',
+    borderColor: Palette.primary,
     borderWidth: 1.5,
   },
   summaryCardPaid: {
-    backgroundColor: '#F3ECFB',
-    borderColor: '#E3D5F8',
+    backgroundColor: Palette.iconBg,
+    borderColor: Palette.border,
   },
   summaryCardActivePaid: {
-    borderColor: '#4B0082',
+    borderColor: Palette.primary,
     borderWidth: 1.5,
   },
   summaryCardDue: {
-    backgroundColor: '#F3ECFB',
-    borderColor: '#E3D5F8',
+    backgroundColor: Palette.iconBg,
+    borderColor: Palette.border,
   },
   summaryCardActiveDue: {
-    borderColor: '#4B0082',
+    borderColor: Palette.primary,
     borderWidth: 1.5,
   },
   summaryValue: {
@@ -1375,13 +1375,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summaryValueTotal: {
-    color: '#4B0082',
+    color: Palette.primary,
   },
   summaryValuePaid: {
-    color: '#4B0082',
+    color: Palette.primary,
   },
   summaryValueDue: {
-    color: '#4B0082',
+    color: Palette.primary,
   },
   summaryLabel: {
     fontSize: 11,
@@ -1463,7 +1463,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   roomDropdownRowSelected: {
-    backgroundColor: '#F3ECFB',
+    backgroundColor: Palette.iconBg,
   },
   roomDropdownLeft: {
     flex: 1,

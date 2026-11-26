@@ -16,6 +16,8 @@ import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useCustomerData } from '../../context/CustomerDataContext';
 
+const ACCOUNTS_CARD_BG = require('../../../assets/accounts-card-bg.jpg');
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -217,70 +219,77 @@ export default function CustomerRulesAndDocsView({
               </View>
 
               <View style={styles.agreementCard}>
-                <View style={styles.agreementTopRow}>
-                  <View style={styles.agreementTitleCol}>
-                    <Text style={styles.agreementTitle}>Residential Lease Agreement</Text>
+                <Image
+                  source={ACCOUNTS_CARD_BG}
+                  style={styles.agreementCardBgImage}
+                  resizeMode="stretch"
+                />
+                <View style={styles.agreementCardContent}>
+                  <View style={styles.agreementTopRow}>
+                    <View style={styles.agreementTitleCol}>
+                      <Text style={styles.agreementTitle}>Residential Lease Agreement</Text>
+                    </View>
+                    <View style={styles.activePill}>
+                      <Text style={styles.activePillText}>Active</Text>
+                    </View>
                   </View>
-                  <View style={styles.activePill}>
-                    <Text style={styles.activePillText}>Active</Text>
-                  </View>
-                </View>
 
-                {/* Key Agreement Terms Grid */}
-                <View style={styles.termsGrid}>
-                  <View style={styles.termBox}>
-                    <Text style={styles.termLabel}>Monthly Rent</Text>
-                    <Text style={styles.termValue}>{room.monthlyRent}</Text>
+                  {/* Key Agreement Terms Grid */}
+                  <View style={styles.termsGrid}>
+                    <View style={styles.termBox}>
+                      <Text style={styles.termLabel}>Monthly Rent</Text>
+                      <Text style={styles.termValue}>{room.monthlyRent}</Text>
+                    </View>
+                    <View style={styles.termBox}>
+                      <Text style={styles.termLabel}>Security Deposit</Text>
+                      <Text style={styles.termValue}>{room.depositAmount}</Text>
+                    </View>
+                    <View style={styles.termBox}>
+                      <Text style={styles.termLabel}>Lease Duration</Text>
+                      <Text style={styles.termValue}>
+                        {leaseInfo.totalMonths || 11} Months
+                      </Text>
+                    </View>
+                    <View style={styles.termBox}>
+                      <Text style={styles.termLabel}>Notice Period</Text>
+                      <Text style={styles.termValue}>
+                        {leaseInfo.noticePeriodDays || 30} Days
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.termBox}>
-                    <Text style={styles.termLabel}>Security Deposit</Text>
-                    <Text style={styles.termValue}>{room.depositAmount}</Text>
-                  </View>
-                  <View style={styles.termBox}>
-                    <Text style={styles.termLabel}>Lease Duration</Text>
-                    <Text style={styles.termValue}>
-                      {leaseInfo.totalMonths || 11} Months
+
+                  <View style={styles.agreementParties}>
+                    <Text style={styles.partyText}>
+                      <Text style={styles.partyLabel}>Tenant: </Text>
+                      {profile.fullName}
+                    </Text>
+                    <Text style={styles.partyText}>
+                      <Text style={styles.partyLabel}>Owner: </Text>
+                      {ownerContact.name} ({ownerContact.phone})
+                    </Text>
+                    <Text style={styles.partyText}>
+                      <Text style={styles.partyLabel}>Valid Period: </Text>
+                      {leaseInfo.startDate} to {leaseInfo.endDate}
                     </Text>
                   </View>
-                  <View style={styles.termBox}>
-                    <Text style={styles.termLabel}>Notice Period</Text>
-                    <Text style={styles.termValue}>
-                      {leaseInfo.noticePeriodDays || 30} Days
+
+                  <TouchableOpacity
+                    style={[styles.downloadAgreementBtn, isDownloading && { opacity: 0.7 }]}
+                    onPress={() => void handleDownloadAgreement()}
+                    disabled={isDownloading}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Download"
+                  >
+                    <Text style={styles.downloadAgreementText}>
+                      {isDownloading
+                        ? 'Downloading...'
+                        : downloadSuccess
+                        ? 'Downloaded ✓'
+                        : 'Download '}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 </View>
-
-                <View style={styles.agreementParties}>
-                  <Text style={styles.partyText}>
-                    <Text style={styles.partyLabel}>Tenant: </Text>
-                    {profile.fullName}
-                  </Text>
-                  <Text style={styles.partyText}>
-                    <Text style={styles.partyLabel}>Owner: </Text>
-                    {ownerContact.name} ({ownerContact.phone})
-                  </Text>
-                  <Text style={styles.partyText}>
-                    <Text style={styles.partyLabel}>Valid Period: </Text>
-                    {leaseInfo.startDate} to {leaseInfo.endDate}
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.downloadAgreementBtn, isDownloading && { opacity: 0.7 }]}
-                  onPress={() => void handleDownloadAgreement()}
-                  disabled={isDownloading}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel="Download"
-                >
-                  <Text style={styles.downloadAgreementText}>
-                    {isDownloading
-                      ? 'Downloading...'
-                      : downloadSuccess
-                      ? 'Downloaded ✓'
-                      : 'Download '}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
           ) : null}
@@ -445,7 +454,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: 20,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
@@ -458,7 +467,7 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -468,7 +477,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.primary,
   },
   filterChipText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 12,
     fontWeight: '600',
     color: Palette.text,
   },
@@ -482,7 +491,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 14,
     fontWeight: '800',
     color: Palette.text,
   },
@@ -496,8 +505,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Palette.border,
     borderRadius: 5,
-    padding: 16,
     marginBottom: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  agreementCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  agreementCardContent: {
+    width: '100%',
+    padding: 16,
   },
   agreementTopRow: {
     flexDirection: 'row',
@@ -520,7 +543,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   agreementTitle: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 14,
     fontWeight: '700',
     color: Palette.text,
   },
@@ -535,7 +558,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   activePillText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     fontWeight: '700',
     color: Palette.status.paid.text,
   },
@@ -543,7 +566,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    backgroundColor: Palette.tint,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderWidth: 1,
     borderColor: Palette.border,
     borderRadius: 5,
@@ -555,21 +578,26 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   termLabel: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 11,
     color: Palette.textSecondary,
     fontWeight: '600',
     marginBottom: 2,
   },
   termValue: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 10,
     fontWeight: '700',
     color: Palette.text,
   },
   agreementParties: {
     gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: 5,
+    padding: 12,
   },
   partyText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     color: Palette.text,
   },
   partyLabel: {
@@ -604,7 +632,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   ruleCategory: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 14,
     fontWeight: '700',
     color: Palette.primary,
   },
@@ -617,7 +645,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   levelBadgeText: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 10,
     fontWeight: '700',
     color: Palette.textSecondary,
   },
@@ -625,18 +653,18 @@ const styles = StyleSheet.create({
     color: Palette.status.overdue.text,
   },
   ruleTitle: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 12,
     fontWeight: '700',
     color: Palette.text,
     marginBottom: 4,
   },
   ruleSummary: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     color: Palette.text,
     lineHeight: 18,
   },
   ruleDetails: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     color: Palette.textSecondary,
     lineHeight: 17,
     marginTop: 6,
@@ -700,7 +728,7 @@ const styles = StyleSheet.create({
   imageTapHintText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#F8F5FC',
+    color: Palette.onPrimary,
   },
   imageViewerOverlay: {
     flex: 1,
@@ -726,7 +754,7 @@ const styles = StyleSheet.create({
   imageViewerTitle: {
     fontSize: Typography.fontSize.base,
     fontWeight: '700',
-    color: '#F8F5FC',
+    color: Palette.onPrimary,
   },
   imageViewerCloseBtn: {
     width: 38,

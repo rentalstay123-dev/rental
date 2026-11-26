@@ -20,7 +20,8 @@ interface DashboardViewProps {
   onNavigatePage?: (
     page: 'Rooms' | 'Rent' | 'Money' | 'Accounts' | 'Notifications' | 'Requests',
     noticeId?: string,
-    rentFilter?: RentFilter
+    rentFilter?: RentFilter,
+    options?: { openCreateModal?: boolean }
   ) => void;
 }
 
@@ -250,7 +251,10 @@ export default function DashboardView({ onNavigatePage }: DashboardViewProps) {
             <TouchableOpacity
               style={styles.headerRequestButton}
               activeOpacity={0.7}
-              onPress={() => onNavigatePage && onNavigatePage('Requests')}
+              onPress={() =>
+                onNavigatePage &&
+                onNavigatePage('Requests', undefined, undefined, { openCreateModal: true })
+              }
               accessibilityRole="button"
               accessibilityLabel="Request"
             >
@@ -330,8 +334,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   profitCard: {
-    backgroundColor: '#E0D2F7',
-    borderRadius: 15,
+    backgroundColor: Palette.iconBg,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Palette.border,
     marginBottom: 14,

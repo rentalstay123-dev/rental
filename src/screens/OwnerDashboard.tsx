@@ -70,6 +70,7 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | undefined>(undefined);
   const [rentFilter, setRentFilter] = useState<RentFilter>('All');
   const [rentViewKey, setRentViewKey] = useState(0);
+  const [shouldOpenCreateRequestModal, setShouldOpenCreateRequestModal] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
@@ -106,6 +107,7 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleMenuSelect = (key: DrawerMenuKey) => {
+    setShouldOpenCreateRequestModal(false);
     switch (key) {
       case 'Requests':
         setActivePage('Requests');
@@ -204,8 +206,13 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
       case 'Requests':
         return (
           <RequestsView
+            key={shouldOpenCreateRequestModal ? 'requests-create' : 'requests-list'}
             initialRequestId={selectedNoticeId}
-            onBack={() => setActivePage('Home')}
+            initialOpenCreateModal={shouldOpenCreateRequestModal}
+            onBack={() => {
+              setShouldOpenCreateRequestModal(false);
+              setActivePage('Home');
+            }}
           />
         );
       case 'Policy':
@@ -214,18 +221,25 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
       default:
         return (
           <DashboardView
-            onNavigatePage={(page, noticeId, nextRentFilter) => {
-              if (page === 'Rooms') setActivePage('Rooms');
-              else if (page === 'Rent') {
+            onNavigatePage={(page, noticeId, nextRentFilter, options) => {
+              if (page === 'Rooms') {
+                setShouldOpenCreateRequestModal(false);
+                setActivePage('Rooms');
+              } else if (page === 'Rent') {
+                setShouldOpenCreateRequestModal(false);
                 setRentFilter(nextRentFilter ?? 'All');
                 setRentViewKey((k) => k + 1);
                 setActivePage('Rent');
-              } else if (page === 'Money' || page === 'Accounts') setActivePage('Accounts');
-              else if (page === 'Notifications') {
+              } else if (page === 'Money' || page === 'Accounts') {
+                setShouldOpenCreateRequestModal(false);
+                setActivePage('Accounts');
+              } else if (page === 'Notifications') {
+                setShouldOpenCreateRequestModal(false);
                 setSelectedNoticeId(noticeId);
                 setActivePage('Notifications');
               } else if (page === 'Requests') {
                 setSelectedNoticeId(noticeId);
+                setShouldOpenCreateRequestModal(Boolean(options?.openCreateModal));
                 setActivePage('Requests');
               }
             }}
@@ -303,6 +317,7 @@ function OwnerDashboardContent({ onLogout }: { onLogout?: () => void }) {
                   key={tab.key}
                   style={[styles.navTab, isActive && styles.navTabActive]}
                   onPress={() => {
+                    setShouldOpenCreateRequestModal(false);
                     if (tab.key === 'Rent') {
                       setRentFilter('All');
                       setRentViewKey((k) => k + 1);

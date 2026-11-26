@@ -8,126 +8,45 @@ import type {
   RoomItem,
   RoomRentMeta,
 } from '../types/appData';
-import { formatShortDate, MONTHS_SHORT, parseRupeeAmount } from '../utils/finance';
-import {
-  createInitialRentMeta,
-  DEFAULT_OWNER_PROFILE,
-  DEFAULT_WORKSPACE_SETTINGS,
-  INITIAL_ROOMS,
-  INITIAL_STAFF,
-} from './initialData';
+import { formatShortDate, MONTHS_SHORT } from '../utils/finance';
+import { DEFAULT_WORKSPACE_SETTINGS } from './initialData';
 
-function cloneRoom(room: RoomItem): RoomItem {
+function findInitialRoomByNumber(roomNumber?: string): RoomItem {
+  const norm = roomNumber?.trim() || 'Room 101';
+  const label = /^room(?:[\s-]+|(?=\d))/i.test(norm)
+    ? `Room ${norm.replace(/^room(?:[\s-]+|(?=\d))/i, '').trim()}`
+    : `Room ${norm}`;
   return {
-    ...room,
-    furnishings: room.furnishings ? [...room.furnishings] : undefined,
-    members: room.members.map((m) => ({ ...m })),
+    id: 'r-user',
+    roomNumber: label,
+    wing: 'Floor 1',
+    type: '1 BHK',
+    monthlyRent: '₹0',
+    depositAmount: '₹0',
+    joinedDate: formatShortDate(new Date()),
+    status: 'Occupied',
+    bookingType: 'Family',
+    roomsCount: 1,
+    bathrooms: 1,
+    balconies: 0,
+    areaSqFt: '',
+    furnished: 'Unfurnished',
+    members: [],
   };
 }
 
-function findInitialRoomByNumber(roomNumber?: string): RoomItem {
-  if (roomNumber && roomNumber.trim()) {
-    const normalized = roomNumber.trim().toLowerCase();
-    const match = INITIAL_ROOMS.find(
-      (r) =>
-        r.roomNumber.toLowerCase() === normalized ||
-        r.roomNumber.toLowerCase().replace(/\s+/g, '') === normalized.replace(/\s+/g, '') ||
-        r.roomNumber.replace(/[^0-9]/g, '') === normalized.replace(/[^0-9]/g, '')
-    );
-    if (match) return cloneRoom(match);
-  }
-  // Default to Room 102 (active due bill + rich history & furnishings)
-  const fallback = INITIAL_ROOMS.find((r) => r.id === '2') ?? INITIAL_ROOMS[0];
-  return cloneRoom(fallback);
-}
-
-export function createInitialCustomerRequests(
-  now: Date = new Date(),
-  roomNumber: string = 'Room 102'
-): CustomerServiceRequest[] {
-  const ts = now.getTime();
-  return [
-    {
-      id: 'creq-1',
-      category: 'Plumbing',
-      title: 'Kitchen sink tap dripping',
-      description: `Slow drip from the cold water valve in ${roomNumber} kitchen sink. Needs washer replacement.`,
-      priority: 'Normal',
-      status: 'In Progress',
-      createdAt: ts - 5 * 60 * 60 * 1000,
-      timeLabel: '5h ago',
-      roomNumber,
-      assignedTo: `${INITIAL_STAFF[2]?.name ?? 'Suresh Shetty'} · Maintenance`,
-      ownerNote: 'Scheduled for inspection today between 4:00 PM and 6:00 PM.',
-    },
-    {
-      id: 'creq-2',
-      category: 'Electrical',
-      title: 'Balcony light fixture flicker',
-      description: 'LED tube in balcony flickers occasionally when switched on at night.',
-      priority: 'Normal',
-      status: 'Resolved',
-      createdAt: ts - 6 * 24 * 60 * 60 * 1000,
-      timeLabel: '6d ago',
-      roomNumber,
-      assignedTo: `${INITIAL_STAFF[2]?.name ?? 'Suresh Shetty'} · Maintenance`,
-      ownerNote: 'Replaced starter and LED tube. Marked resolved.',
-    },
-  ];
+export function createInitialCustomerRequests(now?: Date, roomNumber?: string): CustomerServiceRequest[] {
+  return [];
 }
 
 export function createInitialCustomerNotices(
-  now: Date = new Date(),
-  roomNumber: string = 'Room 102',
-  rentStatus: RoomRentMeta['currentStatus'] = 'Due',
-  rentAmount: string = '₹15,000',
-  dueDateLabel: string = formatShortDate(now)
+  now?: Date,
+  roomNumber?: string,
+  rentStatus?: RoomRentMeta['currentStatus'],
+  rentAmount?: string,
+  dueDateLabel?: string
 ): CustomerNotice[] {
-  const ts = now.getTime();
-  const billingNotice: CustomerNotice =
-    rentStatus === 'Paid'
-      ? {
-          id: 'cnot-1',
-          category: 'Billing',
-          title: 'Monthly Rent Paid',
-          message: `Your rent of ${rentAmount} for ${roomNumber} has been marked as paid. Thank you!`,
-          timeLabel: 'Today',
-          createdAt: ts - 60 * 60 * 1000,
-          isRead: false,
-        }
-      : {
-          id: 'cnot-1',
-          category: 'Billing',
-          title: `Rent Due Reminder · ${roomNumber}`,
-          message: `Monthly rent of ${rentAmount} is due by ${dueDateLabel}. Pay via UPI or bank transfer to avoid late fee.`,
-          timeLabel: '2h ago',
-          createdAt: ts - 2 * 60 * 60 * 1000,
-          isRead: false,
-        };
-
-  return [
-    billingNotice,
-    {
-      id: 'cnot-2',
-      category: 'Maintenance',
-      title: 'Water Tank Cleaning Schedule',
-      message:
-        'Overhead water tank cleaning is scheduled this Sunday from 10:00 AM to 1:00 PM. Please store water in advance.',
-      timeLabel: 'Yesterday',
-      createdAt: ts - 24 * 60 * 60 * 1000,
-      isRead: false,
-    },
-    {
-      id: 'cnot-3',
-      category: 'Property',
-      title: 'Visitor Parking & Gate Security',
-      message:
-        'Please register overnight guest vehicles with night security (Ramesh Naik) at the main gate.',
-      timeLabel: '4d ago',
-      createdAt: ts - 4 * 24 * 60 * 60 * 1000,
-      isRead: true,
-    },
-  ];
+  return [];
 }
 
 export function createInitialCustomerData(hints?: {
@@ -139,65 +58,33 @@ export function createInitialCustomerData(hints?: {
   const now = new Date();
   const room = findInitialRoomByNumber(hints?.roomNumber);
 
-  // If user registered with a custom room number not in sample list, reflect that room number cleanly
-  const customRoomNumber = hints?.roomNumber?.trim();
-  if (
-    customRoomNumber &&
-    room.roomNumber.toLowerCase() !== customRoomNumber.toLowerCase() &&
-    !INITIAL_ROOMS.some(
-      (r) => r.roomNumber.replace(/[^0-9]/g, '') === customRoomNumber.replace(/[^0-9]/g, '')
-    )
-  ) {
-    room.roomNumber = /^room\s+/i.test(customRoomNumber)
-      ? `Room ${customRoomNumber.replace(/^room\s+/i, '').trim()}`
-      : `Room ${customRoomNumber}`;
-  }
+  const resolvedName = hints?.fullName?.trim() || 'Resident';
+  const resolvedEmail = hints?.email?.trim() || '';
+  const resolvedProperty = hints?.propertyName?.trim() || '';
 
-  const primaryMember = room.members[0];
-  const resolvedName = hints?.fullName?.trim() || primaryMember?.name || 'Priya Sharma';
-  const resolvedEmail = hints?.email?.trim() || 'resident@luvora.com';
-  const resolvedProperty = hints?.propertyName?.trim() || DEFAULT_OWNER_PROFILE.propertyName;
+  const fallbackDueDate = `1 ${MONTHS_SHORT[now.getMonth()]} ${now.getFullYear()}`;
 
-  if (room.members.length > 0 && hints?.fullName?.trim()) {
-    room.members[0] = {
-      ...room.members[0],
-      name: resolvedName,
-    };
-  }
+  const rentMeta: RoomRentMeta = {
+    roomId: room.id,
+    maintenanceAmount: '₹0',
+    advancePayment: '₹0',
+    dueDate: fallbackDueDate,
+    paymentCycle: 'Monthly',
+    currentStatus: 'Paid',
+    statusBadgeText: 'Paid',
+    history: [],
+  };
 
-  const allRentMeta = createInitialRentMeta(now);
-  const currMonthShort = MONTHS_SHORT[now.getMonth()];
-  const fallbackDueDate = `1 ${currMonthShort} ${now.getFullYear()}`;
-  const rawMeta = allRentMeta[room.id];
-
-  const rentMeta: RoomRentMeta = rawMeta
-    ? {
-        ...rawMeta,
-        history: rawMeta.history.map((h) => ({ ...h })),
-      }
-    : {
-        roomId: room.id,
-        maintenanceAmount: '₹2,000',
-        advancePayment: '₹0',
-        dueDate: fallbackDueDate,
-        paymentCycle: 'Monthly',
-        currentStatus: room.status === 'Rent due' ? 'Due' : 'Paid',
-        statusBadgeText: room.status === 'Rent due' ? 'Due' : 'Paid',
-        history: [],
-      };
-
-  const depositNumeric = parseRupeeAmount(room.depositAmount);
-  const receivedDate = room.joinedDate || 'Mar 01, 2026';
   const deposit: RoomDepositOverride = {
     roomId: room.id,
     roomNumber: room.roomNumber,
-    amount: room.depositAmount,
-    numericAmount: depositNumeric,
+    amount: '₹0',
+    numericAmount: 0,
     deductedAmount: '₹0',
     numericDeducted: 0,
     dateReceived: '',
     paymentMode: 'UPI',
-    status: depositNumeric > 0 ? 'Due' : 'No Deposit',
+    status: 'No Deposit',
     history: [],
   };
 
@@ -205,9 +92,9 @@ export function createInitialCustomerData(hints?: {
     profile: {
       fullName: resolvedName,
       email: resolvedEmail,
-      phone: primaryMember?.phone || '+91 98765 43210',
-      emergencyContactName: room.members[1]?.name || 'Meera Sharma',
-      emergencyContactPhone: room.members[1]?.phone || '+91 98765 67890',
+      phone: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
       propertyName: resolvedProperty,
       roomNumber: room.roomNumber,
       alertsEnabled: true,
@@ -215,30 +102,24 @@ export function createInitialCustomerData(hints?: {
     room,
     rentMeta,
     deposit,
-    requests: createInitialCustomerRequests(now, room.roomNumber),
-    notices: createInitialCustomerNotices(
-      now,
-      room.roomNumber,
-      rentMeta.currentStatus,
-      room.monthlyRent,
-      rentMeta.dueDate
-    ),
+    requests: [],
+    notices: [],
     ownerContact: {
-      name: DEFAULT_OWNER_PROFILE.fullName,
-      phone: DEFAULT_OWNER_PROFILE.phone,
-      email: DEFAULT_OWNER_PROFILE.email,
-      caretakerName: INITIAL_STAFF[0]?.name || 'Ramesh Naik',
-      caretakerPhone: INITIAL_STAFF[0]?.phone || '+91 98451 22001',
-      bankName: DEFAULT_OWNER_PROFILE.bankName,
-      accountHolder: DEFAULT_OWNER_PROFILE.accountHolder,
-      accountNumber: DEFAULT_OWNER_PROFILE.accountNumber,
-      ifscCode: DEFAULT_OWNER_PROFILE.ifscCode,
-      upiId: 'luvora.sunrise@hdfcbank',
+      name: resolvedProperty ? `${resolvedProperty} Management` : 'Property Management',
+      phone: '',
+      email: '',
+      caretakerName: '',
+      caretakerPhone: '',
+      bankName: '',
+      accountHolder: '',
+      accountNumber: '',
+      ifscCode: '',
+      upiId: '',
     },
     leaseInfo: {
-      startDate: receivedDate,
-      endDate: 'Feb 28, 2027',
-      completedMonths: 8,
+      startDate: formatShortDate(now),
+      endDate: '',
+      completedMonths: 0,
       totalMonths: 11,
       noticePeriodDays: 30,
       rentCycleDay: DEFAULT_WORKSPACE_SETTINGS.rentCycleDay,
@@ -246,7 +127,7 @@ export function createInitialCustomerData(hints?: {
       lateFee: DEFAULT_WORKSPACE_SETTINGS.lateFee,
     },
     rules: createInitialPropertyRules(),
-    documents: createInitialResidentDocuments(room.roomNumber),
+    documents: [],
   };
 }
 
@@ -307,63 +188,7 @@ export function createInitialPropertyRules(): PropertyRule[] {
   ];
 }
 
-export function createInitialResidentDocuments(roomNumber: string = 'Room 102'): ResidentDocument[] {
-  return [
-    {
-      id: 'doc-1',
-      title: 'Residential Lease Agreement',
-      category: 'Agreement',
-      fileType: 'PDF',
-      fileSize: '2.4 MB',
-      status: 'Active',
-      uploadedDate: 'Mar 01, 2026',
-      referenceNumber: `AGR-2026-${roomNumber.replace(/\s+/g, '')}`,
-      description: `11-Month registered residential rental agreement between Property Owner and Resident for ${roomNumber}.`,
-    },
-    {
-      id: 'doc-2',
-      title: 'Aadhaar Card (ID Verification)',
-      category: 'Identification',
-      fileType: 'PDF',
-      fileSize: '1.1 MB',
-      status: 'Verified',
-      uploadedDate: 'Mar 01, 2026',
-      referenceNumber: 'ID-AAD-8821',
-      description: 'Government issued identity and permanent address verification proof.',
-    },
-    {
-      id: 'doc-3',
-      title: 'Police Verification Form',
-      category: 'Verification',
-      fileType: 'PDF',
-      fileSize: '820 KB',
-      status: 'Verified',
-      uploadedDate: 'Mar 05, 2026',
-      referenceNumber: 'PV-2026-BLR-094',
-      description: 'Local police station tenant verification acknowledgement certificate.',
-    },
-    {
-      id: 'doc-4',
-      title: 'Move-in Inspection & Inventory',
-      category: 'Agreement',
-      fileType: 'PDF',
-      fileSize: '640 KB',
-      status: 'Active',
-      uploadedDate: 'Mar 01, 2026',
-      referenceNumber: `INV-${roomNumber.replace(/\s+/g, '')}-M01`,
-      description: 'Signed inventory record of room electricals, fittings, furniture, and condition at possession.',
-    },
-    {
-      id: 'doc-5',
-      title: 'Security Deposit Acknowledgment',
-      category: 'Receipt',
-      fileType: 'PDF',
-      fileSize: '410 KB',
-      status: 'Verified',
-      uploadedDate: 'Mar 01, 2026',
-      referenceNumber: `DEP-REC-2026-${roomNumber.replace(/\s+/g, '')}`,
-      description: 'Formal payment acknowledgment for refundable security deposit held by management.',
-    },
-  ];
+export function createInitialResidentDocuments(roomNumber?: string): ResidentDocument[] {
+  return [];
 }
 

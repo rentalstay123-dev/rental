@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -78,10 +78,16 @@ export default function CustomerDrawer({
   roomNumber,
 }: CustomerDrawerProps) {
   const insets = useSafeAreaInsets();
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const handleClose = () => {
+    setShowLogoutConfirm(false);
+    onClose();
+  };
 
   const handleItemPress = (key: CustomerDrawerMenuKey) => {
     onSelectMenu(key);
-    onClose();
+    handleClose();
   };
 
   return (
@@ -89,10 +95,10 @@ export default function CustomerDrawer({
       visible={visible}
       animationType="fade"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalOverlay}>
-        <TouchableWithoutFeedback onPress={onClose}>
+        <TouchableWithoutFeedback onPress={handleClose}>
           <View style={styles.backdrop} />
         </TouchableWithoutFeedback>
 
@@ -114,7 +120,7 @@ export default function CustomerDrawer({
             </View>
 
             <TouchableOpacity
-              onPress={onClose}
+              onPress={handleClose}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               style={styles.closeSquareButton}
               activeOpacity={0.7}
@@ -176,11 +182,10 @@ export default function CustomerDrawer({
 
             <TouchableOpacity
               style={styles.logoutButton}
-              onPress={() => {
-                onClose();
-                onLogout();
-              }}
+              onPress={() => setShowLogoutConfirm(true)}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Log out"
             >
               <Feather
                 name="log-out"
@@ -192,6 +197,56 @@ export default function CustomerDrawer({
             </TouchableOpacity>
           </ScrollView>
         </View>
+
+        {/* Confirmation Modal Overlay */}
+        {showLogoutConfirm && (
+          <View style={styles.confirmBackdrop}>
+            <TouchableWithoutFeedback onPress={() => setShowLogoutConfirm(false)}>
+              <View style={StyleSheet.absoluteFill} />
+            </TouchableWithoutFeedback>
+            <View style={styles.confirmCard}>
+              <View style={styles.confirmHeader}>
+                <Text style={styles.confirmTitle}>Sign Out</Text>
+                <TouchableOpacity
+                  onPress={() => setShowLogoutConfirm(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={styles.confirmCloseBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close sign out confirmation"
+                >
+                  <Feather name="x" size={Typography.iconSize.base} color={Palette.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.confirmBody}>
+                Are you sure you want to sign out of your resident account?
+              </Text>
+              <View style={styles.confirmBtnRow}>
+                <TouchableOpacity
+                  style={styles.confirmCancelBtn}
+                  activeOpacity={0.75}
+                  onPress={() => setShowLogoutConfirm(false)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel sign out"
+                >
+                  <Text style={styles.confirmCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.confirmLogoutBtn}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    setShowLogoutConfirm(false);
+                    onClose();
+                    onLogout();
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Confirm sign out"
+                >
+                  <Text style={styles.confirmLogoutText}>Sign Out</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -327,6 +382,84 @@ const styles = StyleSheet.create({
   logoutText: {
     color: Palette.onPrimary,
     fontSize: Typography.fontSize.md,
+    fontWeight: '700',
+  },
+  confirmBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 22,
+    zIndex: 9999,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: Palette.surface,
+    borderRadius: Radius.md,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 14,
+    elevation: 20,
+  },
+  confirmHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  confirmTitle: {
+    fontSize: Typography.fontSize.lg,
+    fontWeight: '800',
+    color: Palette.text,
+  },
+  confirmCloseBtn: {
+    padding: 4,
+  },
+  confirmBody: {
+    fontSize: Typography.fontSize.base,
+    color: Palette.textSecondary,
+    lineHeight: 22,
+    marginBottom: 20,
+  },
+  confirmBtnRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    backgroundColor: Palette.surface,
+    borderWidth: 1,
+    borderColor: Palette.border,
+    borderRadius: Radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmCancelText: {
+    color: Palette.text,
+    fontSize: Typography.fontSize.base,
+    fontWeight: '600',
+  },
+  confirmLogoutBtn: {
+    flex: 1,
+    backgroundColor: Palette.primary,
+    borderRadius: Radius.sm,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmLogoutText: {
+    color: Palette.onPrimary,
+    fontSize: Typography.fontSize.base,
     fontWeight: '700',
   },
 });

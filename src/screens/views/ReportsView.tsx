@@ -439,10 +439,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backButtonCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Palette.iconBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    padding: 4,
   },
   headerTitle: {
     fontSize: Typography.fontSize.xxl,
@@ -490,8 +493,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   mainCard: {
-    backgroundColor: '#E0D2F7',
-    borderRadius: 15,
+    backgroundColor: Palette.iconBg,
+    borderRadius: 8,
     marginBottom: 14,
     borderWidth: 1,
     borderColor: Palette.border,

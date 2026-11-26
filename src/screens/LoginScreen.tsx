@@ -15,26 +15,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import {
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signInWithEmailAndPassword,
-  updateProfile,
-} from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { auth, getFirebaseAuthErrorMessage } from '../config/firebase';
+import { supabase, getSupabaseAuthErrorMessage } from '../config/supabase';
 import {
   fetchUserRole,
   initializeCustomerProfile,
   initializeRegisteredUserProfile,
   saveUserRole,
-} from '../services/firestoreService';
+} from '../services/supabaseService';
 import type { UserRole } from '../types/appData';
-import {
-  getBuiltInRoleByEmail,
-  LOCAL_SESSION_STORAGE_KEY,
-  matchBuiltInAccount,
-} from '../constants/authAccounts';
 import LuvoraLogo from '../components/LuvoraLogo';
 import { Palette, Radius, Typography } from '../constants/theme';
 
@@ -77,7 +66,9 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
     }
     try {
       const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
-      if (cached === 'owner' || cached === 'customer') return cached;
+      if (cached === 'owner' || cached === 'customer' || cached === 'admin') {
+        return cached === 'admin' ? 'owner' : (cached as UserRole);
+      }
     } catch {
       // Ignore storage read errors
     }
@@ -96,115 +87,60 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
     setIsLoading(true);
     onAuthHoldChange?.(true);
 
-    const builtIn = matchBuiltInAccount(trimmedEmail, password);
-
-    const completeLocalFallback = async () => {
-      if (!builtIn) return false;
-      const localSession = {
-        uid: builtIn.localUid,
-        email: builtIn.email,
-        displayName: builtIn.displayName,
-        role: builtIn.role,
-      };
-      try {
-        await AsyncStorage.setItem(LOCAL_SESSION_STORAGE_KEY, JSON.stringify(localSession));
-      } catch {
-        // Ignore storage errors
-      }
-      onLoginSuccess?.(localSession);
-      onAuthHoldChange?.(false);
-      return true;
-    };
-
     try {
-      const credential = await signInWithEmailAndPassword(auth, trimmedEmail, password);
-      const uid = credential.user.uid;
-      const finalRole =
-        getBuiltInRoleByEmail(credential.user.email ?? trimmedEmail) ??
-        (await resolveAccountRole(uid));
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data.user) {
+        throw new Error('Authentication failed. No user record returned.');
+      }
+
+      const uid = data.user.id;
+      const rawRole = data.user.user_metadata?.role as string | undefined;
+      const metadataRole: UserRole | undefined =
+        rawRole === 'admin'
+          ? 'owner'
+          : rawRole === 'customer' || rawRole === 'owner'
+          ? rawRole
+          : undefined;
+
+      const finalRole = metadataRole ?? (await resolveAccountRole(uid));
+
+      // Auto-set: If role is not yet stored in Supabase or metadata, set it now
+      if (!rawRole) {
+        try {
+          await saveUserRole(uid, finalRole);
+        } catch {
+          // Ignore
+        }
+      }
 
       try {
         await AsyncStorage.setItem(`@luvora_role_${uid}`, finalRole);
-        await AsyncStorage.removeItem(LOCAL_SESSION_STORAGE_KEY);
       } catch {
         // Ignore storage error
       }
 
+      const metaName =
+        (data.user.user_metadata?.displayName as string | undefined) ||
+        (data.user.user_metadata?.full_name as string | undefined);
+
       onLoginSuccess?.({
         uid,
-        email: credential.user.email ?? trimmedEmail,
-        displayName: credential.user.displayName ?? builtIn?.displayName ?? undefined,
+        email: data.user.email ?? trimmedEmail,
+        displayName: metaName,
         role: finalRole,
       });
       onAuthHoldChange?.(false);
     } catch (error) {
-      const code = (error as { code?: string })?.code;
-      if (
-        builtIn &&
-        (code === 'auth/user-not-found' || code === 'auth/invalid-credential')
-      ) {
-        try {
-          const created = await createUserWithEmailAndPassword(
-            auth,
-            builtIn.email,
-            builtIn.password
-          );
-          await updateProfile(created.user, { displayName: builtIn.displayName });
-          try {
-            await AsyncStorage.setItem(`@luvora_role_${created.user.uid}`, builtIn.role);
-            await AsyncStorage.removeItem(LOCAL_SESSION_STORAGE_KEY);
-          } catch {
-            // Ignore cache error
-          }
-          try {
-            if (builtIn.role === 'customer') {
-              await initializeCustomerProfile(created.user.uid, {
-                email: builtIn.email,
-                fullName: builtIn.displayName,
-                roomNumber: builtIn.roomNumber,
-                propertyName: builtIn.propertyName,
-              });
-            } else {
-              await initializeRegisteredUserProfile(created.user.uid, {
-                email: builtIn.email,
-                fullName: builtIn.displayName,
-                propertyName: builtIn.propertyName,
-              });
-            }
-          } catch {
-            // Non-fatal if Firestore is offline
-          }
-          onLoginSuccess?.({
-            uid: created.user.uid,
-            email: builtIn.email,
-            displayName: builtIn.displayName,
-            role: builtIn.role,
-          });
-          onAuthHoldChange?.(false);
-          return;
-        } catch (createErr) {
-          const createCode = (createErr as { code?: string })?.code;
-          if (
-            createCode === 'auth/network-request-failed' ||
-            createCode === 'auth/operation-not-allowed'
-          ) {
-            if (await completeLocalFallback()) return;
-          }
-          onAuthHoldChange?.(false);
-          setAuthError(getFirebaseAuthErrorMessage(createErr));
-          return;
-        }
-      }
-
-      if (
-        builtIn &&
-        (code === 'auth/network-request-failed' || code === 'auth/operation-not-allowed')
-      ) {
-        if (await completeLocalFallback()) return;
-      }
-
       onAuthHoldChange?.(false);
-      setAuthError(getFirebaseAuthErrorMessage(error));
+      setAuthError(getSupabaseAuthErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -244,7 +180,8 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
     setIsModalLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, trimmedEmail);
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail);
+      if (error) throw error;
       setIsForgotModalVisible(false);
       setAuthError(null);
       setAuthSuccess(
@@ -257,7 +194,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
         );
       }
     } catch (error) {
-      setModalError(getFirebaseAuthErrorMessage(error, 'Could not send reset email.'));
+      setModalError(getSupabaseAuthErrorMessage(error, 'Could not send reset email.'));
     } finally {
       setIsModalLoading(false);
     }
@@ -281,43 +218,65 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
     onAuthHoldChange?.(true);
 
     try {
-      const credential = await createUserWithEmailAndPassword(auth, trimmedEmail, regPassword);
-      await updateProfile(credential.user, { displayName: trimmedName });
+      const { data, error } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password: regPassword,
+        options: {
+          data: {
+            displayName: trimmedName,
+            role: regRole,
+            propertyName: regProperty.trim(),
+            roomNumber: regRoomNumber.trim(),
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      const user = data.user;
+      if (!user) {
+        throw new Error('Registration failed. Please check your credentials.');
+      }
+
+      const uid = user.id;
+
       try {
-        await AsyncStorage.setItem(`@luvora_role_${credential.user.uid}`, regRole);
+        await saveUserRole(uid, regRole);
       } catch {
         // Ignore local cache write error
       }
       try {
         if (regRole === 'customer') {
-          await initializeCustomerProfile(credential.user.uid, {
-            email: credential.user.email ?? trimmedEmail,
+          await initializeCustomerProfile(uid, {
+            email: user.email ?? trimmedEmail,
             fullName: trimmedName,
             roomNumber: regRoomNumber.trim(),
             propertyName: regProperty.trim(),
           });
         } else {
-          await initializeRegisteredUserProfile(credential.user.uid, {
-            email: credential.user.email ?? trimmedEmail,
+          await initializeRegisteredUserProfile(uid, {
+            email: user.email ?? trimmedEmail,
             fullName: trimmedName,
             propertyName: regProperty.trim(),
           });
-          await saveUserRole(credential.user.uid, 'owner');
+          await saveUserRole(uid, 'owner');
         }
       } catch {
-        // Non-fatal: dashboard initialization will fall back gracefully if Firestore is offline.
+        // Non-fatal
       }
       setIsRegisterModalVisible(false);
       onLoginSuccess?.({
-        uid: credential.user.uid,
-        email: credential.user.email ?? trimmedEmail,
+        uid,
+        email: user.email ?? trimmedEmail,
         displayName: trimmedName,
         role: regRole,
       });
       onAuthHoldChange?.(false);
     } catch (error) {
       onAuthHoldChange?.(false);
-      setModalError(getFirebaseAuthErrorMessage(error, 'Could not create account.'));
+      setModalError(getSupabaseAuthErrorMessage(error, 'Could not create account.'));
     } finally {
       setIsModalLoading(false);
     }
@@ -373,7 +332,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="you@example.com"
+                  placeholder="Enter your email address"
                   placeholderTextColor={Palette.textMuted}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -518,7 +477,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
             <Text style={styles.inputLabel}>Registered email</Text>
             <TextInput
               style={styles.modalInputField}
-              placeholder="you@example.com"
+              placeholder="Enter your registered email address"
               placeholderTextColor={Palette.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -608,7 +567,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
             <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput
               style={styles.modalInputField}
-              placeholder={regRole === 'customer' ? 'e.g. Priya Sharma' : 'e.g. Rajesh Sharma'}
+              placeholder="Enter your full name"
               placeholderTextColor={Palette.textMuted}
               value={regName}
               onChangeText={(value) => {
@@ -620,7 +579,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
               style={styles.modalInputField}
-              placeholder={regRole === 'customer' ? 'e.g. resident@luvora.com' : 'e.g. owner@luvora.com'}
+              placeholder="Enter your email address"
               placeholderTextColor={Palette.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"

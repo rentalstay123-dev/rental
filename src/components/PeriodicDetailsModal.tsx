@@ -650,13 +650,13 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                 TOTAL INFLOW
               </Text>
               <Text
-                style={[styles.overviewCardValue, { color: '#15803D' }]}
+                style={[styles.overviewCardValue, { color: Palette.status.paid.text }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
                 {formatRupeeAmount(totalInflow)}
               </Text>
-              <View style={[styles.cardAccentBar, { backgroundColor: '#15803D' }]} />
+              <View style={[styles.cardAccentBar, { backgroundColor: Palette.status.paid.text }]} />
             </View>
 
             {/* Outflow Card */}
@@ -665,13 +665,13 @@ export default function PeriodicDetailsModal({ visible, onClose }: PeriodicDetai
                 TOTAL OUTFLOW
               </Text>
               <Text
-                style={[styles.overviewCardValue, { color: '#B91C1C' }]}
+                style={[styles.overviewCardValue, { color: Palette.status.overdue.text }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
                 {formatRupeeAmount(totalOutflow)}
               </Text>
-              <View style={[styles.cardAccentBar, { backgroundColor: '#B91C1C' }]} />
+              <View style={[styles.cardAccentBar, { backgroundColor: Palette.status.overdue.text }]} />
             </View>
 
             {/* Net Balance Card */}
@@ -951,7 +951,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
     padding: 14,
     marginBottom: 14,
   },
@@ -978,7 +978,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: Palette.tint,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
     borderRadius: 5,
     paddingHorizontal: 12,
     height: 42,
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
     borderRadius: 5,
     padding: 12,
   },
@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: Palette.iconBg,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
   },
   presetBtnActive: {
     backgroundColor: Palette.primary,
@@ -1126,7 +1126,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
     minHeight: 88,
     justifyContent: 'space-between',
     ...Platform.select({
@@ -1177,7 +1177,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Palette.surface,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
     borderRadius: 5,
     paddingHorizontal: 10,
     height: 38,
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     padding: 2,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
   },
   typePill: {
     paddingHorizontal: 10,
@@ -1219,7 +1219,7 @@ const styles = StyleSheet.create({
     backgroundColor: Palette.surface,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: Palette.border,
     overflow: 'hidden',
     marginBottom: 24,
   },
@@ -1231,7 +1231,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     backgroundColor: Palette.tint,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: Palette.border,
   },
   tableTopBarTitle: {
     fontSize: Typography.fontSize.sm,

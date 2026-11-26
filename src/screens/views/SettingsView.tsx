@@ -69,7 +69,7 @@ const getFallbackFinancialsForType = (type: string): RoomTypeDefaultFinancials =
   if (key.includes('2bhk')) return DEFAULT_ROOM_TYPE_FINANCIALS['2 BHK'];
   if (key.includes('studio') || key.includes('1rk')) return DEFAULT_ROOM_TYPE_FINANCIALS['Studio / 1 RK'];
   if (key.includes('1bhk')) return DEFAULT_ROOM_TYPE_FINANCIALS['1 BHK'];
-  return { rent: '₹9,000', deposit: '₹18,000' };
+  return { rent: '₹0', deposit: '₹0' };
 };
 
 const sortFloorsList = (list: string[]): string[] =>
@@ -109,7 +109,6 @@ export default function SettingsView({
     settings: ctxSettings,
     updateSettings,
     clearAllWorkspaceData,
-    restoreSampleWorkspaceData,
     refreshWorkspace,
   } = useAppData();
 
@@ -346,26 +345,7 @@ export default function SettingsView({
   };
 
   const handleDeleteFloor = (floorName: string) => {
-    if (floors.length <= 1) {
-      setStatusNotice('You must keep at least one floor configured.');
-      return;
-    }
-    const assignedRoomsCount = rooms.filter((r) =>
-      matchesFloorName(getRoomFloor(r), floorName)
-    ).length;
-    setConfirmDialog({
-      title: 'Delete Floor',
-      message:
-        assignedRoomsCount > 0
-          ? `Remove "${floorName}" from Settings? ${assignedRoomsCount} existing ${assignedRoomsCount === 1 ? 'unit' : 'units'} on this floor will remain until deleted.`
-          : `Are you sure you want to remove "${floorName}"?`,
-      confirmLabel: 'Delete',
-      onConfirm: () => {
-        setFloors(floors.filter((f) => !matchesFloorName(f, floorName)));
-        setStatusNotice(`"${floorName}" removed from configured floors.`);
-        setConfirmDialog(null);
-      },
-    });
+    setFloors(floors.filter((f) => !matchesFloorName(f, floorName)));
   };
 
   // --- ROOM TYPE HANDLERS ---
@@ -463,25 +443,12 @@ export default function SettingsView({
   };
 
   const handleDeleteRoomType = (roomType: string) => {
-    if (roomTypes.length <= 1) {
-      setStatusNotice('You must have at least one room type configured.');
-      return;
-    }
-    setConfirmDialog({
-      title: 'Delete Room Type',
-      message: `Are you sure you want to remove "${roomType}"? Existing units of this type will remain in your records.`,
-      confirmLabel: 'Delete',
-      onConfirm: () => {
-        const nextTypes = roomTypes.filter((t) => t !== roomType);
-        const nextDefaultsMap = { ...roomTypeDefaults };
-        delete nextDefaultsMap[roomType];
-        void updateSettings({
-          roomTypes: nextTypes,
-          roomTypeDefaults: nextDefaultsMap,
-        });
-        setStatusNotice(`"${roomType}" removed from room types.`);
-        setConfirmDialog(null);
-      },
+    const nextTypes = roomTypes.filter((t) => t !== roomType);
+    const nextDefaultsMap = { ...roomTypeDefaults };
+    delete nextDefaultsMap[roomType];
+    void updateSettings({
+      roomTypes: nextTypes,
+      roomTypeDefaults: nextDefaultsMap,
     });
   };
 
@@ -538,16 +505,7 @@ export default function SettingsView({
   };
 
   const handleDeleteReason = (reason: string) => {
-    setConfirmDialog({
-      title: 'Delete Reason',
-      message: `Are you sure you want to remove "${reason}"?`,
-      confirmLabel: 'Delete',
-      onConfirm: () => {
-        setMaintenanceReasons(maintenanceReasons.filter((r) => r !== reason));
-        setStatusNotice(`"${reason}" removed.`);
-        setConfirmDialog(null);
-      },
-    });
+    setMaintenanceReasons(maintenanceReasons.filter((r) => r !== reason));
   };
 
   // --- UNIT / ROOM HANDLERS ---
@@ -675,7 +633,7 @@ export default function SettingsView({
             id: `${Date.now()}`,
             name: newTenant.trim(),
             role: 'Primary Resident',
-            phone: newTenantPhone.trim() || '+91 98000 00000',
+            phone: newTenantPhone.trim(),
           },
         ];
       }
@@ -710,7 +668,7 @@ export default function SettingsView({
               id: Date.now().toString(),
               name: newTenant.trim(),
               role: 'Primary Resident',
-              phone: newTenantPhone.trim() || '+91 98000 00000',
+              phone: newTenantPhone.trim(),
             },
           ];
 
@@ -749,7 +707,6 @@ export default function SettingsView({
       confirmLabel: 'Delete',
       onConfirm: () => {
         void removeRoom(room);
-        setStatusNotice(`${room.roomNumber} deleted.`);
         setConfirmDialog(null);
       },
     });
@@ -888,15 +845,13 @@ export default function SettingsView({
                       >
                         <Feather name="edit-2" size={15} color={Palette.primary} />
                       </TouchableOpacity>
-                      {floors.length > 1 && (
-                        <TouchableOpacity
-                          style={styles.iconActionBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          onPress={() => handleDeleteFloor(floorName)}
-                        >
-                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity
+                        style={styles.iconActionBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => handleDeleteFloor(floorName)}
+                      >
+                        <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                   {!isLast && <View style={styles.divider} />}
@@ -950,15 +905,13 @@ export default function SettingsView({
                       >
                         <Feather name="edit-2" size={15} color={Palette.primary} />
                       </TouchableOpacity>
-                      {roomTypes.length > 1 && (
-                        <TouchableOpacity
-                          style={styles.iconActionBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          onPress={() => handleDeleteRoomType(type)}
-                        >
-                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity
+                        style={styles.iconActionBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => handleDeleteRoomType(type)}
+                      >
+                        <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                   {!isLast && <View style={styles.divider} />}
@@ -1082,15 +1035,13 @@ export default function SettingsView({
                       >
                         <Feather name="edit-2" size={15} color={Palette.primary} />
                       </TouchableOpacity>
-                      {maintenanceReasons.length > 1 && (
-                        <TouchableOpacity
-                          style={styles.iconActionBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          onPress={() => handleDeleteReason(reason)}
-                        >
-                          <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
-                        </TouchableOpacity>
-                      )}
+                      <TouchableOpacity
+                        style={styles.iconActionBtn}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        onPress={() => handleDeleteReason(reason)}
+                      >
+                        <Feather name="trash-2" size={16} color={Palette.status.overdue.text} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                   {!isLast && <View style={styles.divider} />}
@@ -1223,32 +1174,6 @@ export default function SettingsView({
           {/* Workspace Data Management */}
           <View style={styles.card}>
             <Text style={styles.sectionHeader}>WORKSPACE DATA</Text>
-
-            <TouchableOpacity
-              style={styles.switchRow}
-              activeOpacity={0.75}
-              onPress={() =>
-                setConfirmDialog({
-                  title: 'Restore Sample Data',
-                  message:
-                    'Replace current units, rent ledger, transactions, and notifications with default sample property data?',
-                  confirmLabel: 'Restore',
-                  onConfirm: () => {
-                    setConfirmDialog(null);
-                    void restoreSampleWorkspaceData();
-                    setStatusNotice('Sample property data restored.');
-                  },
-                })
-              }
-            >
-              <View style={styles.switchTextCol}>
-                <Text style={styles.switchTitle}>Restore Sample Property Data</Text>
-                <Text style={styles.switchSub}>Populate units, rent history, and transactions</Text>
-              </View>
-              <Feather name="refresh-cw" size={Typography.iconSize.sm} color={Palette.primary} />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
 
             <TouchableOpacity
               style={styles.switchRow}
@@ -1646,7 +1571,7 @@ export default function SettingsView({
                   <Text style={styles.inputLabel}>Resident Phone</Text>
                   <TextInput
                     style={styles.inputField}
-                    placeholder="e.g. +91 98765 00000"
+                    placeholder="Enter phone number"
                     placeholderTextColor={Palette.textMuted}
                     keyboardType="phone-pad"
                     value={newTenantPhone}

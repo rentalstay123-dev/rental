@@ -9,7 +9,7 @@ import {
   ensureCustomerWorkspaceInitialized,
   saveCustomerWorkspace,
   subscribeCustomerWorkspace,
-} from '../services/firestoreService';
+} from '../services/supabaseService';
 import type {
   CustomerNotice,
   CustomerProfile,
@@ -85,14 +85,14 @@ const getStorageKey = (uid: string) => `@luvora_customer_workspace_${uid}`;
 
 function getFriendlySyncError(error: unknown): string {
   const code = (error as { code?: string })?.code;
-  if (code === 'permission-denied') {
-    return 'Firestore permission denied. Changes are saved locally on this device.';
+  if (code === 'permission-denied' || code === '42501') {
+    return 'Supabase permission denied. Check your Row Level Security (RLS) policies.';
   }
-  if (code === 'unavailable') {
-    return 'Offline mode: changes are saved locally until reconnected.';
+  if (code === 'unavailable' || code === 'PGRST205') {
+    return 'Supabase tables not configured yet. Changes are stored locally.';
   }
   const msg = (error as { message?: string })?.message;
-  return msg ? `Cloud sync issue: ${msg}` : 'Could not sync with Firestore.';
+  return msg ? `Cloud sync issue: ${msg}` : 'Could not sync with Supabase.';
 }
 
 export function CustomerDataProvider({
@@ -597,7 +597,7 @@ export function CustomerDataProvider({
   const addCustomerDocument = useCallback(
     async (input: AddDocumentInput): Promise<ResidentDocument> => {
       const current = dataRef.current;
-      const roomNum = current.room?.roomNumber || 'Room 102';
+      const roomNum = current.room?.roomNumber || 'Room';
       const cleanRef = `DOC-${roomNum.replace(/\s+/g, '')}-${Date.now().toString().slice(-4)}`;
       const newDoc: ResidentDocument = {
         id: `doc-${Date.now()}`,

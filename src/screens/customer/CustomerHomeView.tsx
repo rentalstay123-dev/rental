@@ -7,11 +7,14 @@ import {
   TouchableOpacity,
   RefreshControl,
   Linking,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useCustomerData } from '../../context/CustomerDataContext';
 import { formatRupeeAmount, MONTHS_FULL, parseRupeeAmount } from '../../utils/finance';
+
+const netProfitBg = require('../../../assets/net-profit-bg.png');
 
 export type CustomerPageKey =
   | 'Home'
@@ -63,7 +66,6 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
       ? Math.min(100, Math.max(0, Math.round((leaseInfo.completedMonths / leaseInfo.totalMonths) * 100)))
       : 0;
 
-  const unreadNotices = notices.filter((n) => !n.isRead);
   const latestNotice = notices[0];
   const latestRequest = requests[0];
 
@@ -95,77 +97,85 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
           </View>
         </View>
 
-        {/* Hero Card: Rent & Lease Status */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroHeaderRow}>
-            <Text style={styles.heroHeader}>Rent status · {currentMonthName}</Text>
-            <View style={styles.statusBadge}>
-              <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                {rentMeta.statusBadgeText}
-              </Text>
+        {/* Hero Card: Rent & Lease Status matching Admin style */}
+        <View style={styles.profitCard}>
+          <Image
+            source={netProfitBg}
+            style={styles.profitCardBgImage}
+            resizeMode="cover"
+          />
+          <View style={styles.profitCardContent}>
+            <View style={styles.profitHeaderRow}>
+              <Text style={styles.profitHeader}>Rent status · {currentMonthName}</Text>
+              <View style={styles.statusBadge}>
+                <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                  {rentMeta.statusBadgeText}
+                </Text>
+              </View>
             </View>
-          </View>
 
-          <Text style={styles.heroAmount}>
-            {isDue ? formatRupeeAmount(totalDue) : '₹0 due'}
-          </Text>
+            <Text style={styles.profitAmount}>
+              {isDue ? formatRupeeAmount(totalDue) : '₹0 due'}
+            </Text>
 
-          <Text style={styles.heroBreakdown}>
-            Rent {room.monthlyRent}  ·  Maint. {rentMeta.maintenanceAmount}
-            {advanceNumeric > 0 ? `  ·  Adv. ${rentMeta.advancePayment}` : ''}
-          </Text>
+            <Text style={styles.profitBreakdown}>
+              Rent {room.monthlyRent}  ·  Maint. {rentMeta.maintenanceAmount}
+              {advanceNumeric > 0 ? `  ·  Adv. ${rentMeta.advancePayment}` : ''}
+            </Text>
 
-          <View
-            style={styles.progressTrack}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel={`Lease progress: ${leasePct}% completed`}
-            accessibilityValue={{ min: 0, max: 100, now: leasePct }}
-          >
-            <View style={[styles.progressFill, { width: `${leasePct}%` }]} />
-          </View>
-          <Text style={styles.progressScaleText}>
-            Lease month {leaseInfo.completedMonths} of {leaseInfo.totalMonths} · Due {rentMeta.dueDate}
-          </Text>
+            <View
+              style={styles.profitTrack}
+              accessible
+              accessibilityRole="progressbar"
+              accessibilityLabel={`Lease progress: ${leasePct}% completed`}
+              accessibilityValue={{ min: 0, max: 100, now: leasePct }}
+            >
+              <View style={[styles.profitFill, { width: `${leasePct}%` }]} />
+            </View>
+            <Text style={styles.profitScaleText}>
+              Lease month {leaseInfo.completedMonths} of {leaseInfo.totalMonths} · Due {rentMeta.dueDate}
+            </Text>
 
-          <View style={styles.heroActionRow}>
-            {isDue ? (
-              <TouchableOpacity
-                style={styles.primaryCtaBtn}
-                activeOpacity={0.85}
-                onPress={() => onNavigatePage?.('Payments', { openPayModal: true })}
-                accessibilityRole="button"
-                accessibilityLabel="Pay rent now"
-              >
-                <Feather name="credit-card" size={16} color={Palette.onPrimary} />
-                <Text style={styles.primaryCtaText}>Pay Rent Now</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.secondaryCtaBtn}
-                activeOpacity={0.85}
-                onPress={() => onNavigatePage?.('Payments')}
-                accessibilityRole="button"
-                accessibilityLabel="View payment receipts"
-              >
-                <Feather name="file-text" size={16} color={Palette.primary} />
-                <Text style={styles.secondaryCtaText}>View Receipts & Ledger</Text>
-              </TouchableOpacity>
-            )}
+            <View style={styles.heroActionRow}>
+              {isDue ? (
+                <TouchableOpacity
+                  style={styles.primaryCtaBtn}
+                  activeOpacity={0.85}
+                  onPress={() => onNavigatePage?.('Payments', { openPayModal: true })}
+                  accessibilityRole="button"
+                  accessibilityLabel="Pay rent now"
+                >
+                  <Feather name="credit-card" size={16} color={Palette.onPrimary} />
+                  <Text style={styles.primaryCtaText}>Pay Rent Now</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.secondaryCtaBtn}
+                  activeOpacity={0.85}
+                  onPress={() => onNavigatePage?.('Payments')}
+                  accessibilityRole="button"
+                  accessibilityLabel="View payment receipts"
+                >
+                  <Feather name="file-text" size={16} color={Palette.primary} />
+                  <Text style={styles.secondaryCtaText}>View Receipts & Ledger</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
 
-        {/* Metric Card: Security Deposit */}
+        {/* 2-Column Metric Cards matching Admin Dashboard */}
         <View style={styles.metricRow}>
-          <TouchableOpacity
-            style={styles.metricCardFull}
-            activeOpacity={0.85}
-            onPress={() => onNavigatePage?.('Payments')}
-            accessibilityRole="button"
-            accessibilityLabel={`Security deposit ${deposit.amount}, ${deposit.status}`}
-          >
-            <View style={styles.metricHeaderRow}>
-              <Text style={styles.metricLabel}>Security deposit</Text>
+          <View style={styles.metricCol}>
+            <Text style={styles.metricHeading}>Security deposit</Text>
+            <TouchableOpacity
+              style={styles.metricCard}
+              activeOpacity={0.85}
+              onPress={() => onNavigatePage?.('Payments')}
+              accessibilityRole="button"
+              accessibilityLabel={`Security deposit ${deposit.amount}, ${deposit.status}`}
+            >
+              <Text style={styles.metricValue}>{deposit.amount}</Text>
               <Text
                 style={[
                   styles.metricSubtext,
@@ -177,9 +187,26 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
                   ? 'Held · Refundable'
                   : 'Due · Tap to pay'}
               </Text>
-            </View>
-            <Text style={styles.metricValue}>{deposit.amount}</Text>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.metricCol}>
+            <Text style={styles.metricHeading}>Assigned room</Text>
+            <TouchableOpacity
+              style={styles.metricCard}
+              activeOpacity={0.85}
+              onPress={() => onNavigatePage?.('Room')}
+              accessibilityRole="button"
+              accessibilityLabel={`Room ${room.roomNumber}, ${room.type}`}
+            >
+              <Text style={[styles.metricValue, { color: Palette.primary }]}>
+                {room.roomNumber}
+              </Text>
+              <Text style={styles.metricSubtext}>
+                {room.type} · {room.wing}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Section: Upcoming & Recent Payments */}
@@ -301,12 +328,17 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
         <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
           <Text style={styles.sectionTitle}>Notification</Text>
           <TouchableOpacity
+            style={styles.viewAllButton}
             activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={() => onNavigatePage?.('Notices')}
           >
-            <Text style={styles.actionLinkText}>
-              {unreadNotices.length > 0 ? `${unreadNotices.length} unread` : 'View all'}
-            </Text>
+            <Text style={styles.viewAllText}>View All</Text>
+            <Feather
+              name="chevron-right"
+              size={Typography.iconSize.sm}
+              color={Palette.primary}
+            />
           </TouchableOpacity>
         </View>
 
@@ -318,14 +350,11 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
                 activeOpacity={0.7}
                 onPress={() => onNavigatePage?.('Notices', { noticeId: latestNotice.id })}
               >
-                <View style={styles.noticeIconCircle}>
-                  <Feather name="bell" size={16} color={Palette.primary} />
-                </View>
-                <View style={styles.listLeftCol}>
-                  <Text style={styles.compactTitle} numberOfLines={1}>
+                <View style={styles.centeredTextCol}>
+                  <Text style={[styles.compactTitle, styles.centeredText]} numberOfLines={1}>
                     {latestNotice.title}
                   </Text>
-                  <Text style={styles.rowSub} numberOfLines={1}>
+                  <Text style={[styles.rowSub, styles.centeredText]} numberOfLines={1}>
                     {latestNotice.message}
                   </Text>
                 </View>
@@ -340,16 +369,22 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
           ) : null}
 
           <View style={styles.supportRow}>
-            <View style={styles.noticeIconCircle}>
-              <Feather name="phone-call" size={16} color={Palette.primary} />
-            </View>
-            <View style={styles.listLeftCol}>
-              <Text style={styles.compactTitle} numberOfLines={1}>
+            <View style={styles.centeredTextCol}>
+              <Text
+                style={[
+                  styles.compactTitle,
+                  styles.centeredText,
+                  !ownerContact.phone && { marginBottom: 0 },
+                ]}
+                numberOfLines={1}
+              >
                 {ownerContact.name} · Property Owner
               </Text>
-              <Text style={styles.rowSub} numberOfLines={1}>
-                {ownerContact.phone}
-              </Text>
+              {ownerContact.phone ? (
+                <Text style={[styles.rowSub, styles.centeredText]} numberOfLines={1}>
+                  {ownerContact.phone}
+                </Text>
+              ) : null}
             </View>
             <TouchableOpacity
               style={styles.callChip}
@@ -364,14 +399,13 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
 
         {/* Section: Service Requests */}
         <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
-          <Text style={styles.sectionTitle}>Requests</Text>
+          <Text style={styles.sectionTitle}>Service Requests</Text>
           <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => onNavigatePage?.('Requests')}
+            style={styles.headerRequestButton}
+            activeOpacity={0.85}
+            onPress={() => onNavigatePage?.('Requests', { openNewRequestModal: true })}
           >
-            <Text style={styles.actionLinkText}>
-              {requests.length > 0 ? `${requests.length} total` : 'View all'}
-            </Text>
+            <Text style={styles.headerRequestButtonText}>Request</Text>
           </TouchableOpacity>
         </View>
 
@@ -383,12 +417,9 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
                 activeOpacity={0.7}
                 onPress={() => onNavigatePage?.('Requests')}
               >
-                <View style={styles.noticeIconCircle}>
-                  <Feather name="tool" size={16} color={Palette.primary} />
-                </View>
-                <View style={styles.listLeftCol}>
-                  <View style={styles.titleBadgeRow}>
-                    <Text style={styles.compactTitle} numberOfLines={1}>
+                <View style={styles.centeredTextCol}>
+                  <View style={[styles.titleBadgeRow, { justifyContent: 'center' }]}>
+                    <Text style={[styles.compactTitle, styles.centeredText]} numberOfLines={1}>
                       {latestRequest.title}
                     </Text>
                     <Text
@@ -407,7 +438,7 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
                       {latestRequest.status}
                     </Text>
                   </View>
-                  <Text style={styles.rowSub} numberOfLines={1}>
+                  <Text style={[styles.rowSub, styles.centeredText]} numberOfLines={1}>
                     {latestRequest.roomNumber || room.roomNumber} · {latestRequest.category} · {latestRequest.timeLabel}
                   </Text>
                 </View>
@@ -426,14 +457,11 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
             activeOpacity={0.7}
             onPress={() => onNavigatePage?.('Requests', { openNewRequestModal: true })}
           >
-            <View style={styles.noticeIconCircle}>
-              <Feather name="plus-circle" size={16} color={Palette.primary} />
-            </View>
-            <View style={styles.listLeftCol}>
-              <Text style={styles.compactTitle} numberOfLines={1}>
+            <View style={styles.centeredTextCol}>
+              <Text style={[styles.compactTitle, styles.centeredText]} numberOfLines={1}>
                 Need Help or Maintenance?
               </Text>
-              <Text style={styles.rowSub} numberOfLines={1}>
+              <Text style={[styles.rowSub, styles.centeredText]} numberOfLines={1}>
                 Tap to submit a new service request
               </Text>
             </View>
@@ -441,42 +469,6 @@ export default function CustomerHomeView({ onNavigatePage }: CustomerHomeViewPro
               <Feather name="plus" size={13} color={Palette.primary} />
               <Text style={styles.callChipText}>New</Text>
             </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Section: Policy */}
-        <View style={[styles.sectionHeaderRow, { marginTop: 24 }]}>
-          <Text style={styles.sectionTitle}>Policy</Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => onNavigatePage?.('RulesAndDocs')}
-          >
-            <Text style={styles.actionLinkText}>View all</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.cardContainer}>
-          <TouchableOpacity
-            style={styles.compactRow}
-            activeOpacity={0.7}
-            onPress={() => onNavigatePage?.('RulesAndDocs')}
-          >
-            <View style={styles.noticeIconCircle}>
-              <Feather name="file-text" size={16} color={Palette.primary} />
-            </View>
-            <View style={styles.listLeftCol}>
-              <Text style={styles.compactTitle} numberOfLines={1}>
-                Policy & House Rules
-              </Text>
-              <Text style={styles.rowSub} numberOfLines={1}>
-                {room.roomNumber} · Quiet hours, visitor policy & lease deed
-              </Text>
-            </View>
-            <Feather
-              name="chevron-right"
-              size={Typography.iconSize.sm}
-              color={Palette.primary}
-            />
           </TouchableOpacity>
         </View>
       </View>
@@ -538,21 +530,35 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Palette.primary,
   },
-  heroCard: {
-    backgroundColor: Palette.surface,
-    borderRadius: 5,
+  profitCard: {
+    backgroundColor: '#E0D2F7',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Palette.border,
+    marginBottom: 14,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profitCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  profitCardContent: {
+    width: '100%',
     paddingVertical: 20,
     paddingHorizontal: 20,
-    marginBottom: 14,
   },
-  heroHeaderRow: {
+  profitHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  heroHeader: {
+  profitHeader: {
     fontSize: Typography.fontSize.base,
     color: Palette.textSecondary,
     fontWeight: '600',
@@ -564,32 +570,32 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
   },
-  heroAmount: {
+  profitAmount: {
     fontSize: Typography.fontSize.hero,
     fontWeight: '800',
     color: Palette.primary,
     marginVertical: 6,
     letterSpacing: -0.5,
   },
-  heroBreakdown: {
+  profitBreakdown: {
     fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
     fontWeight: '500',
   },
-  progressTrack: {
+  profitTrack: {
     width: '100%',
     height: 6,
-    backgroundColor: Palette.border,
+    backgroundColor: 'rgba(75, 0, 130, 0.15)',
     borderRadius: Radius.xs,
     overflow: 'hidden',
     marginTop: 14,
   },
-  progressFill: {
+  profitFill: {
     height: '100%',
     backgroundColor: Palette.primary,
     borderRadius: Radius.xs,
   },
-  progressScaleText: {
+  profitScaleText: {
     fontSize: Typography.fontSize.xs,
     color: Palette.textSecondary,
     fontWeight: '500',
@@ -633,28 +639,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 20,
   },
-  metricCardFull: {
-    width: '100%',
-    backgroundColor: Palette.surface,
-    borderRadius: 5,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Palette.border,
+  metricCol: {
+    width: '48.5%',
   },
-  metricHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+  metricHeading: {
+    fontSize: 14,
+    color: Palette.text,
+    fontWeight: '700',
+    marginBottom: 8,
   },
   metricCard: {
-    width: '48.5%',
     backgroundColor: Palette.surface,
     borderRadius: 5,
     padding: 16,
     borderWidth: 1,
     borderColor: Palette.border,
   },
+
   metricLabel: {
     fontSize: Typography.fontSize.sm,
     color: Palette.textSecondary,
@@ -662,15 +663,28 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   metricValue: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: 15,
     fontWeight: '800',
     color: Palette.text,
     marginBottom: 4,
   },
   metricSubtext: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     color: Palette.textSecondary,
     fontWeight: '400',
+  },
+  headerRequestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Palette.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 5,
+  },
+  headerRequestButtonText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: Palette.onPrimary,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -679,7 +693,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: 17,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.2,
@@ -691,7 +705,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   viewAllText: {
-    fontSize: Typography.fontSize.viewAll,
+    fontSize: 11,
     fontWeight: '700',
     color: Palette.primary,
     textDecorationLine: 'underline',
@@ -727,6 +741,14 @@ const styles = StyleSheet.create({
   listLeftCol: {
     flex: 1,
     marginRight: 12,
+  },
+  centeredTextCol: {
+    flex: 1,
+    marginRight: 12,
+    alignItems: 'center',
+  },
+  centeredText: {
+    textAlign: 'center',
   },
   titleBadgeRow: {
     flexDirection: 'row',
@@ -787,15 +809,6 @@ const styles = StyleSheet.create({
   singleWordTag: {
     fontSize: Typography.fontSize.xs,
     fontWeight: '700',
-  },
-  noticeIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
   },
   supportRow: {
     flexDirection: 'row',

@@ -3,10 +3,8 @@ import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth, getFirebaseAuthErrorMessage } from './src/config/firebase';
-import { fetchUserRole } from './src/services/firestoreService';
-import { getBuiltInRoleByEmail, LOCAL_SESSION_STORAGE_KEY } from './src/constants/authAccounts';
+import { supabase, getSupabaseAuthErrorMessage } from './src/config/supabase';
+import { fetchUserRole, purgeLegacyMockStorage, saveUserRole } from './src/services/supabaseService';
 import type { UserRole } from './src/types/appData';
 import LoadingScreen from './src/screens/LoadingScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -28,82 +26,96 @@ export default function App() {
   const authHoldRef = useRef(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!firebaseUser) {
-        if (authHoldRef.current) return;
-        const restoreLocalSession = async () => {
-          try {
-            const raw = await AsyncStorage.getItem(LOCAL_SESSION_STORAGE_KEY);
-            if (raw) {
-              const parsed = JSON.parse(raw) as AuthenticatedUser;
-              if (parsed?.uid && parsed?.email && (parsed.role === 'owner' || parsed.role === 'customer')) {
-                setCurrentUser(parsed);
-                setIsAuthReady(true);
-                return;
-              }
-            }
-          } catch {
-            // Ignore cache read error
-          }
+    void purgeLegacyMockStorage();
+  }, []);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (isCancelled) return;
+        const supabaseUser = session?.user;
+
+        if (!supabaseUser) {
+          if (authHoldRef.current) return;
           explicitRoleRef.current = null;
           setCurrentUser(null);
           setIsAuthReady(true);
-        };
-        void restoreLocalSession();
-        return;
-      }
-
-      if (authHoldRef.current) {
-        return;
-      }
-
-      const uid = firebaseUser.uid;
-      const resolveUserRole = async () => {
-        const builtInRole = getBuiltInRoleByEmail(firebaseUser.email);
-        let resolvedRole: UserRole = builtInRole ?? 'owner';
-        if (!builtInRole) {
-          try {
-            const remoteRole = await fetchUserRole(uid);
-            if (remoteRole) {
-              resolvedRole = remoteRole;
-              await AsyncStorage.setItem(`@luvora_role_${uid}`, remoteRole);
-            } else {
-              const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
-              if (cached === 'customer' || cached === 'owner') {
-                resolvedRole = cached;
-              }
-            }
-          } catch {
-            try {
-              const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
-              if (cached === 'customer' || cached === 'owner') {
-                resolvedRole = cached;
-              }
-            } catch {
-              // Default to owner when offline and uncached
-            }
-          }
+          return;
         }
 
-        if (authHoldRef.current) return;
+        if (authHoldRef.current) {
+          return;
+        }
 
-        const override = explicitRoleRef.current;
-        const finalRole =
-          builtInRole ?? (override && override.uid === uid ? override.role : resolvedRole);
+        const uid = supabaseUser.id;
+        const resolveUserRole = async () => {
+          await purgeLegacyMockStorage();
+          const rawRole = supabaseUser.user_metadata?.role as string | undefined;
+          let metaRole: UserRole | undefined;
+          if (rawRole === 'admin' || rawRole === 'owner') metaRole = 'owner';
+          else if (rawRole === 'customer') metaRole = 'customer';
 
-        setCurrentUser({
-          uid,
-          email: firebaseUser.email ?? '',
-          displayName: firebaseUser.displayName ?? undefined,
-          role: finalRole,
-        });
-        setIsAuthReady(true);
-      };
+          let resolvedRole: UserRole = metaRole ?? 'owner';
+          if (!metaRole) {
+            try {
+              const remoteRole = await fetchUserRole(uid);
+              if (remoteRole) {
+                resolvedRole = remoteRole === 'admin' ? 'owner' : remoteRole;
+                await AsyncStorage.setItem(`@luvora_role_${uid}`, resolvedRole);
+              } else {
+                const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
+                if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
+                  resolvedRole = cached === 'admin' ? 'owner' : cached;
+                }
+              }
+            } catch {
+              try {
+                const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
+                if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
+                  resolvedRole = cached === 'admin' ? 'owner' : cached;
+                }
+              } catch {
+                // Default to owner when offline and uncached
+              }
+            }
 
-      void resolveUserRole();
-    });
+            // Auto-set: If the role was not in Supabase user metadata, persist it now!
+            try {
+              await saveUserRole(uid, resolvedRole);
+            } catch {
+              // Non-fatal
+            }
+          }
 
-    return unsubscribe;
+          if (authHoldRef.current || isCancelled) return;
+
+          const override = explicitRoleRef.current;
+          const finalRole =
+            metaRole ?? (override && override.uid === uid ? override.role : resolvedRole);
+
+          const metadataName =
+            (supabaseUser.user_metadata?.displayName as string | undefined) ||
+            (supabaseUser.user_metadata?.full_name as string | undefined);
+
+          setCurrentUser({
+            uid,
+            email: supabaseUser.email ?? '',
+            displayName: metadataName,
+            role: finalRole,
+          });
+          setIsAuthReady(true);
+        };
+
+        void resolveUserRole();
+      }
+    );
+
+    return () => {
+      isCancelled = true;
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   const handleSplashFinish = useCallback(() => {
@@ -114,16 +126,12 @@ export default function App() {
     try {
       explicitRoleRef.current = null;
       authHoldRef.current = false;
-      await AsyncStorage.removeItem(LOCAL_SESSION_STORAGE_KEY).catch(() => {});
-      if (auth.currentUser) {
-        await signOut(auth);
-      } else {
-        setCurrentUser(null);
-      }
+      await supabase.auth.signOut().catch(() => {});
+      setCurrentUser(null);
     } catch (error) {
       Alert.alert(
         'Logout Failed',
-        getFirebaseAuthErrorMessage(error, 'Could not sign out. Please try again.')
+        getSupabaseAuthErrorMessage(error, 'Could not sign out. Please try again.')
       );
     }
   }, []);

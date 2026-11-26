@@ -107,8 +107,8 @@ export const Typography = {
 
 export const Radius = {
   xs: 4,     // Progress bars, handles, small chart bars
-  sm: 10,    // Form inputs, action buttons, alert boxes, chips
-  md: 16,    // Cards, list containers, modals, bottom sheets
+  sm: 5,     // Form inputs, action buttons, alert boxes, chips
+  md: 8,     // Cards, list containers, modals, bottom sheets
   pill: 999, // Pill buttons, filter chips, bottom nav bar & tabs, circular avatars & buttons
 } as const;
 

@@ -8,10 +8,14 @@ import {
   Image,
   RefreshControl,
   Linking,
+  Alert,
+  Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useCustomerData } from '../../context/CustomerDataContext';
+
+const roomsHeroBg = require('../../../assets/rooms-hero-bg.png');
 
 interface CustomerRoomViewProps {
   onBack?: () => void;
@@ -26,7 +30,8 @@ function getInitials(name: string): string {
 }
 
 function formatWhatsAppDigits(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
+  const digits = phone.replace(/\D/g, '').replace(/^0+/, '');
+  if (!digits) return '';
   if (digits.length === 10) return `91${digits}`;
   return digits;
 }
@@ -53,20 +58,45 @@ export default function CustomerRoomView({
   const statusColors =
     room.status === 'Rent due' ? Palette.status.due : Palette.status.occupied;
 
-  const handleCall = (phone: string, label: string) => {
-    const digits = phone.replace(/[^\d+]/g, '');
-    if (!digits) return;
-    void Linking.openURL(`tel:${digits}`).catch(() => {
-      setContactNotice(`Call ${label}: ${phone}`);
-    });
+  const notifyContactIssue = (title: string, message: string) => {
+    setContactNotice(message);
+    if (Platform.OS !== 'web') {
+      Alert.alert(title, message);
+    }
   };
 
-  const handleWhatsApp = (phone: string, label: string) => {
+  const handleCall = async (phone: string, label: string) => {
+    const digits = phone.replace(/[^\d+]/g, '');
+    if (!digits) {
+      notifyContactIssue(
+        'Phone Number Unavailable',
+        `No phone number saved for ${label || 'this contact'} yet.`
+      );
+      return;
+    }
+    setContactNotice(null);
+    try {
+      await Linking.openURL(`tel:${digits}`);
+    } catch {
+      notifyContactIssue('Call Contact', `Call ${label}: ${phone}`);
+    }
+  };
+
+  const handleWhatsApp = async (phone: string, label: string) => {
     const digits = formatWhatsAppDigits(phone);
-    if (!digits) return;
-    void Linking.openURL(`https://wa.me/${digits}`).catch(() => {
-      setContactNotice(`WhatsApp ${label}: ${phone}`);
-    });
+    if (!digits) {
+      notifyContactIssue(
+        'WhatsApp Unavailable',
+        `No WhatsApp number saved for ${label || 'this contact'} yet.`
+      );
+      return;
+    }
+    setContactNotice(null);
+    try {
+      await Linking.openURL(`https://wa.me/${digits}`);
+    } catch {
+      notifyContactIssue('WhatsApp Contact', `WhatsApp ${label}: ${phone}`);
+    }
   };
 
   const furnishings = room.furnishings ?? [
@@ -113,45 +143,43 @@ export default function CustomerRoomView({
           <Text style={styles.headerTitle}>Room</Text>
         </View>
 
-        {contactNotice ? (
-          <View style={styles.noticeBanner}>
-            <Text style={styles.noticeBannerText}>{contactNotice}</Text>
-            <TouchableOpacity onPress={() => setContactNotice(null)}>
-              <Text style={styles.noticeDismissText}>Dismiss</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {/* Room Overview Card */}
+        {/* Room Overview Card matching Admin Rooms Hero */}
         <View style={styles.heroCard}>
-          <View style={styles.roomTopRow}>
-            <View style={styles.roomTitleCol}>
-              <Text style={styles.roomNumber}>{room.roomNumber}</Text>
-              <Text style={styles.roomWing}>
-                {room.wing} · {profile.propertyName}
-              </Text>
+          <Image
+            source={roomsHeroBg}
+            style={styles.heroCardBgImage}
+            resizeMode="stretch"
+          />
+          <View style={styles.heroCardContent}>
+            <View style={styles.roomTopRow}>
+              <View style={styles.roomTitleCol}>
+                <Text style={styles.roomNumber}>{room.roomNumber}</Text>
+                <Text style={styles.roomWing}>
+                  {room.wing} · {profile.propertyName}
+                </Text>
+              </View>
+              <View style={styles.statusBadge}>
+                <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                  {room.status}
+                </Text>
+              </View>
             </View>
-            <View style={styles.statusBadge}>
-              <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                {room.status}
-              </Text>
-            </View>
-          </View>
 
-          <View style={styles.divider} />
+            <View style={styles.divider} />
 
-          <View style={styles.financialSummaryRow}>
-            <View style={styles.financialCol}>
-              <Text style={styles.metaLabel}>Monthly Rent</Text>
-              <Text style={styles.metaPrimaryValue}>{room.monthlyRent}</Text>
-            </View>
-            <View style={styles.financialCol}>
-              <Text style={styles.metaLabel}>Maintenance</Text>
-              <Text style={styles.metaValue}>{rentMeta.maintenanceAmount}</Text>
-            </View>
-            <View style={styles.financialCol}>
-              <Text style={styles.metaLabel}>Deposit</Text>
-              <Text style={styles.metaValue}>{room.depositAmount}</Text>
+            <View style={styles.financialSummaryRow}>
+              <View style={styles.financialCol}>
+                <Text style={styles.metaLabel}>Monthly Rent</Text>
+                <Text style={styles.metaPrimaryValue}>{room.monthlyRent}</Text>
+              </View>
+              <View style={styles.financialCol}>
+                <Text style={styles.metaLabel}>Maintenance</Text>
+                <Text style={styles.metaValue}>{rentMeta.maintenanceAmount}</Text>
+              </View>
+              <View style={styles.financialCol}>
+                <Text style={styles.metaLabel}>Deposit</Text>
+                <Text style={styles.metaValue}>{room.depositAmount}</Text>
+              </View>
             </View>
           </View>
         </View>
@@ -204,8 +232,7 @@ export default function CustomerRoomView({
         {/* Residents / Co-occupants */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>RESIDENTS ({room.members.length})</Text>
-            <Text style={styles.joinedMeta}>Moved in {room.joinedDate || leaseInfo.startDate}</Text>
+            <Text style={styles.sectionHeader}>RESIDENTS</Text>
           </View>
 
           {room.members.map((member, idx) => {
@@ -245,25 +272,52 @@ export default function CustomerRoomView({
         <View style={styles.sectionCard}>
           <Text style={styles.sectionHeader}>PROPERTY CONTACTS</Text>
 
+          {contactNotice ? (
+            <View style={styles.noticeBanner}>
+              <Text style={styles.noticeBannerText}>{contactNotice}</Text>
+              <TouchableOpacity onPress={() => setContactNotice(null)}>
+                <Text style={styles.noticeDismissText}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
           <View style={styles.contactRow}>
             <View style={styles.contactIconTile}>
               <Feather name="user" size={16} color={Palette.primary} />
             </View>
             <View style={styles.contactTextCol}>
-              <Text style={styles.contactName}>{ownerContact.name}</Text>
-              <Text style={styles.contactSub}>Property Owner · {ownerContact.phone}</Text>
+              <Text style={styles.contactName}>
+                {ownerContact.name || 'Property Owner'}
+              </Text>
+              <Text style={styles.contactSub}>
+                {ownerContact.phone
+                  ? `Property Owner · ${ownerContact.phone}`
+                  : 'Property Owner · No phone added'}
+              </Text>
             </View>
             <View style={styles.contactActions}>
               <TouchableOpacity
                 style={styles.iconActionBtn}
-                onPress={() => handleCall(ownerContact.phone, ownerContact.name)}
+                onPress={() =>
+                  void handleCall(
+                    ownerContact.phone,
+                    ownerContact.name || 'Property Owner'
+                  )
+                }
+                accessibilityRole="button"
                 accessibilityLabel="Call owner"
               >
                 <Feather name="phone" size={15} color={Palette.primary} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.iconActionBtn}
-                onPress={() => handleWhatsApp(ownerContact.phone, ownerContact.name)}
+                onPress={() =>
+                  void handleWhatsApp(
+                    ownerContact.phone,
+                    ownerContact.name || 'Property Owner'
+                  )
+                }
+                accessibilityRole="button"
                 accessibilityLabel="WhatsApp owner"
               >
                 <Feather name="message-circle" size={15} color={Palette.primary} />
@@ -278,16 +332,41 @@ export default function CustomerRoomView({
               <Feather name="shield" size={16} color={Palette.primary} />
             </View>
             <View style={styles.contactTextCol}>
-              <Text style={styles.contactName}>{ownerContact.caretakerName}</Text>
-              <Text style={styles.contactSub}>Caretaker / Security · {ownerContact.caretakerPhone}</Text>
+              <Text style={styles.contactName}>
+                {ownerContact.caretakerName || 'Caretaker / Security'}
+              </Text>
+              <Text style={styles.contactSub}>
+                {ownerContact.caretakerPhone
+                  ? `Caretaker / Security · ${ownerContact.caretakerPhone}`
+                  : 'No phone added'}
+              </Text>
             </View>
             <View style={styles.contactActions}>
               <TouchableOpacity
                 style={styles.iconActionBtn}
-                onPress={() => handleCall(ownerContact.caretakerPhone, ownerContact.caretakerName)}
+                onPress={() =>
+                  void handleCall(
+                    ownerContact.caretakerPhone,
+                    ownerContact.caretakerName || 'Caretaker / Security'
+                  )
+                }
+                accessibilityRole="button"
                 accessibilityLabel="Call caretaker"
               >
                 <Feather name="phone" size={15} color={Palette.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconActionBtn}
+                onPress={() =>
+                  void handleWhatsApp(
+                    ownerContact.caretakerPhone,
+                    ownerContact.caretakerName || 'Caretaker / Security'
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="WhatsApp caretaker"
+              >
+                <Feather name="message-circle" size={15} color={Palette.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -325,7 +404,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: 24,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
@@ -356,11 +435,26 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     backgroundColor: Palette.surface,
-    borderRadius: 5,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: Palette.border,
-    padding: 18,
     marginBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    transform: [{ scaleX: 1.08 }, { scaleY: 1.18 }],
+  },
+  heroCardContent: {
+    width: '100%',
+    padding: 18,
   },
   roomTopRow: {
     flexDirection: 'row',
@@ -372,13 +466,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   roomNumber: {
-    fontSize: Typography.fontSize.xl,
+    fontSize: 18,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
   },
   roomWing: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 12,
     color: Palette.textSecondary,
     marginTop: 3,
     fontWeight: '500',
@@ -387,7 +481,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   statusBadgeText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     fontWeight: '700',
   },
   divider: {
@@ -404,17 +498,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   metaLabel: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 12,
     color: Palette.textSecondary,
     marginBottom: 2,
   },
   metaPrimaryValue: {
-    fontSize: Typography.fontSize.md,
+    fontSize: 14,
     fontWeight: '800',
     color: Palette.primary,
   },
   metaValue: {
-    fontSize: Typography.fontSize.md,
+    fontSize: 14,
     fontWeight: '700',
     color: Palette.text,
   },
@@ -433,14 +527,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionHeader: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 12,
     fontWeight: '700',
     color: Palette.accentText,
     letterSpacing: 0.8,
     marginBottom: 12,
   },
   joinedMeta: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 10,
     color: Palette.textSecondary,
     fontWeight: '500',
     marginBottom: 12,
@@ -460,12 +554,12 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   specValue: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 12,
     fontWeight: '700',
     color: Palette.text,
   },
   specLabel: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 10,
     color: Palette.textSecondary,
     marginTop: 2,
   },
@@ -484,7 +578,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   countPillText: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 10,
     fontWeight: '700',
     color: Palette.primary,
   },

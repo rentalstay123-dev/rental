@@ -306,361 +306,7 @@ const SAMPLE_DOCUMENTS = [
   'Passport_Copy.pdf',
 ];
 
-export const INITIAL_ROOMS: RoomItem[] = [
-  {
-    id: '1',
-    roomNumber: 'Room 101',
-    wing: 'Floor 1 · East Wing',
-    type: '1 BHK',
-    monthlyRent: '₹9,000',
-    depositAmount: '₹20,000',
-    joinedDate: 'Jan 15, 2026',
-    status: 'Occupied',
-    bookingType: 'Family',
-    roomsCount: 2,
-    bathrooms: 1,
-    balconies: 1,
-    areaSqFt: '620 sq ft',
-    furnished: 'Semi-Furnished',
-    furnishings: [
-      'Queen Bed & Mattress',
-      '2-Door Wardrobe',
-      'Split AC',
-      'Modular Kitchen',
-      'Geyser',
-      'Ceiling Fans (2)',
-    ],
-    members: [
-      {
-        id: 'm1',
-        name: 'Anil Rao',
-        role: 'Primary Resident',
-        phone: '+91 98450 11223',
-        imageUri: SAMPLE_AVATARS[1],
-        documentName: 'Aadhaar_Anil_Rao.pdf',
-      },
-      {
-        id: 'm2',
-        name: 'Kavita Rao',
-        role: 'Spouse / Co-occupant',
-        phone: '+91 98450 33445',
-        imageUri: SAMPLE_AVATARS[0],
-        documentName: 'Aadhaar_Kavita_Rao.pdf',
-      },
-    ],
-  },
-  {
-    id: '2',
-    roomNumber: 'Room 102',
-    wing: 'Floor 1 · West Wing',
-    type: '2 BHK',
-    monthlyRent: '₹8,500',
-    depositAmount: '₹18,000',
-    joinedDate: 'Mar 01, 2026',
-    status: 'Rent due',
-    bookingType: 'Family',
-    roomsCount: 3,
-    bathrooms: 2,
-    balconies: 2,
-    areaSqFt: '960 sq ft',
-    furnished: 'Fully Furnished',
-    furnishings: [
-      'Double Beds (2)',
-      'Wardrobes (2)',
-      'Sofa Set (3-Seater)',
-      'Dining Table (4-Seater)',
-      'Split ACs (2)',
-      'Modular Kitchen',
-      'Geysers (2)',
-      'Washing Machine',
-    ],
-    members: [
-      {
-        id: 'm3',
-        name: 'Priya Sharma',
-        role: 'Primary Resident',
-        phone: '+91 98765 43210',
-        imageUri: SAMPLE_AVATARS[2],
-        documentName: 'PAN_Priya_Sharma.pdf',
-      },
-      {
-        id: 'm4',
-        name: 'Deepa Sharma',
-        role: 'Sister / Co-occupant',
-        phone: '+91 98765 67890',
-        documentName: 'Aadhaar_Deepa_Sharma.pdf',
-      },
-    ],
-  },
-  {
-    id: '3',
-    roomNumber: 'Room 103',
-    wing: 'Floor 1 · East Wing',
-    type: 'Studio / 1 RK',
-    monthlyRent: '₹9,000',
-    depositAmount: '₹18,000',
-    joinedDate: 'Feb 10, 2026',
-    status: 'Occupied',
-    bookingType: 'Bachelor',
-    roomsCount: 1,
-    bathrooms: 1,
-    balconies: 1,
-    areaSqFt: '390 sq ft',
-    furnished: 'Fully Furnished',
-    furnishings: [
-      'Queen Bed & Mattress',
-      'Study Desk & Ergonomic Chair',
-      '2-Door Wardrobe',
-      'Split AC',
-      'Kitchenette Counter & Induction',
-      'Geyser',
-    ],
-    members: [
-      {
-        id: 'm5',
-        name: 'Kiran Das',
-        role: 'Primary Resident',
-        phone: '+91 98123 45678',
-        imageUri: SAMPLE_AVATARS[3],
-        documentName: 'Passport_Kiran_Das.pdf',
-      },
-    ],
-  },
-  {
-    id: '4',
-    roomNumber: 'Room 104',
-    wing: 'Floor 1 · North Wing',
-    type: '1 BHK',
-    monthlyRent: '₹9,500',
-    depositAmount: '₹19,000',
-    joinedDate: 'Apr 05, 2026',
-    status: 'Occupied',
-    bookingType: 'Family',
-    roomsCount: 2,
-    bathrooms: 1,
-    balconies: 1,
-    areaSqFt: '640 sq ft',
-    furnished: 'Fully Furnished',
-    furnishings: [
-      'Queen Bed & Mattress',
-      '3-Door Wardrobe',
-      'Sofa Set (2-Seater)',
-      'Coffee Table',
-      'Split AC',
-      'Modular Kitchen',
-      'Refrigerator & Geyser',
-    ],
-    members: [
-      {
-        id: 'm6',
-        name: 'Sana Khan',
-        role: 'Primary Resident',
-        phone: '+91 97400 99881',
-        documentName: 'Aadhaar_Sana_Khan.pdf',
-      },
-      {
-        id: 'm7',
-        name: 'Zoya Khan',
-        role: 'Co-occupant / Dependent',
-        phone: '+91 97400 99882',
-        documentName: 'Aadhaar_Zoya_Khan.pdf',
-      },
-    ],
-  },
-  {
-    id: '5',
-    roomNumber: 'Room 201',
-    wing: 'Floor 2 · East Wing',
-    type: '1 BHK',
-    monthlyRent: '₹10,000',
-    depositAmount: '₹20,000',
-    joinedDate: 'May 12, 2026',
-    status: 'Rent due',
-    bookingType: 'Bachelor',
-    roomsCount: 2,
-    bathrooms: 1,
-    balconies: 2,
-    areaSqFt: '650 sq ft',
-    furnished: 'Semi-Furnished',
-    furnishings: [
-      'Queen Bed & Mattress',
-      'Wardrobe',
-      'Work Desk',
-      'Modular Kitchen',
-      'Geyser',
-      'Ceiling Fans (2)',
-    ],
-    members: [
-      {
-        id: 'm8',
-        name: 'Arjun Kumar',
-        role: 'Primary Resident',
-        phone: '+91 99001 22334',
-        documentName: 'PAN_Arjun_Kumar.pdf',
-      },
-    ],
-  },
-  {
-    id: '6',
-    roomNumber: 'Room 204',
-    wing: 'Floor 2 · West Wing',
-    type: '1 BHK',
-    monthlyRent: '₹9,500',
-    depositAmount: '₹20,000',
-    status: 'Vacant',
-    roomsCount: 2,
-    bathrooms: 1,
-    balconies: 1,
-    areaSqFt: '615 sq ft',
-    furnished: 'Semi-Furnished',
-    furnishings: [
-      'Queen Bed Frame',
-      '2-Door Wardrobe',
-      'Modular Kitchen Cabinets',
-      'Geyser',
-      'Ceiling Fans (2)',
-      'Curtain Rods',
-    ],
-    members: [],
-  },
-  {
-    id: '7',
-    roomNumber: 'Room 202',
-    wing: 'Floor 2 · North Wing',
-    type: '2 BHK',
-    monthlyRent: '₹12,000',
-    depositAmount: '₹24,000',
-    joinedDate: 'Jun 10, 2026',
-    status: 'Occupied',
-    bookingType: 'Bachelor',
-    roomsCount: 3,
-    bathrooms: 2,
-    balconies: 1,
-    areaSqFt: '1,020 sq ft',
-    furnished: 'Fully Furnished',
-    furnishings: [
-      'Double Beds (2)',
-      'Wardrobes (2)',
-      'Sofa & Center Table',
-      'Split ACs (2)',
-      'Modular Kitchen',
-      'Refrigerator & Geysers (2)',
-    ],
-    members: [
-      {
-        id: 'm9',
-        name: 'Sneha Patel',
-        role: 'Primary Resident',
-        phone: '+91 98450 67123',
-        documentName: 'Aadhaar_Sneha_Patel.pdf',
-      },
-    ],
-  },
-  {
-    id: '8',
-    roomNumber: 'Room 205',
-    wing: 'Floor 2 · South Wing',
-    type: '2 BHK',
-    monthlyRent: '₹12,500',
-    depositAmount: '₹25,000',
-    status: 'Vacant',
-    roomsCount: 3,
-    bathrooms: 2,
-    balconies: 2,
-    areaSqFt: '1,050 sq ft',
-    furnished: 'Semi-Furnished',
-    furnishings: [
-      'Double Beds (2)',
-      'Built-in Wardrobes (2)',
-      'Modular Kitchen & Utility Sink',
-      'Geysers (2)',
-      'Ceiling Fans (3)',
-      'Exhaust Fans',
-    ],
-    members: [],
-  },
-  {
-    id: '9',
-    roomNumber: 'Room 301',
-    wing: 'Floor 3 · East Wing',
-    type: '3 BHK',
-    monthlyRent: '₹18,000',
-    depositAmount: '₹36,000',
-    joinedDate: 'Jan 20, 2026',
-    status: 'Occupied',
-    bookingType: 'Family',
-    roomsCount: 4,
-    bathrooms: 3,
-    balconies: 3,
-    areaSqFt: '1,420 sq ft',
-    furnished: 'Fully Furnished',
-    furnishings: [
-      'King & Queen Beds (3)',
-      'Wardrobes (3)',
-      'L-Shaped Sofa & TV Unit',
-      '6-Seater Dining Table',
-      'Split ACs (3)',
-      'Modular Kitchen & Chimney',
-      'Geysers (3)',
-      'Washing Machine & Fridge',
-    ],
-    members: [
-      {
-        id: 'm10',
-        name: 'Rajesh Hegde',
-        role: 'Primary Resident',
-        phone: '+91 99880 11224',
-        documentName: 'Aadhaar_Rajesh_Hegde.pdf',
-      },
-    ],
-  },
-  {
-    id: '10',
-    roomNumber: 'Room 302',
-    wing: 'Floor 3 · West Wing',
-    type: '3 BHK',
-    monthlyRent: '₹18,500',
-    depositAmount: '₹37,000',
-    status: 'Vacant',
-    roomsCount: 4,
-    bathrooms: 3,
-    balconies: 2,
-    areaSqFt: '1,380 sq ft',
-    furnished: 'Semi-Furnished',
-    furnishings: [
-      'Queen Beds (3)',
-      'Sliding Wardrobes (3)',
-      'Modular Kitchen & Chimney',
-      'Geysers (3)',
-      'Ceiling Fans (4)',
-      'LED Lighting Fixtures',
-    ],
-    members: [],
-  },
-  {
-    id: '11',
-    roomNumber: 'Room 105',
-    wing: 'Floor 1 · South Wing',
-    type: 'Studio / 1 RK',
-    monthlyRent: '₹7,500',
-    depositAmount: '₹15,000',
-    status: 'Vacant',
-    roomsCount: 1,
-    bathrooms: 1,
-    balconies: 1,
-    areaSqFt: '360 sq ft',
-    furnished: 'Semi-Furnished',
-    furnishings: [
-      'Single/Queen Bed',
-      'Study Table & Chair',
-      'Wardrobe',
-      'Kitchenette Counter',
-      'Geyser',
-      'Ceiling Fan',
-    ],
-    members: [],
-  },
-];
+export const INITIAL_ROOMS: RoomItem[] = [];
 
 interface BookingMemberDraft {
   name: string;
@@ -1018,7 +664,6 @@ export default function RoomsView({
           members: updatedMembers,
         };
         setRooms(rooms.map((r) => (r.id === activeRoom.id ? updatedRoom : r)));
-        setStatusNotice(`${member.name} has been removed from ${activeRoom.roomNumber}.`);
         setConfirmDialog(null);
       },
     });
@@ -1034,7 +679,6 @@ export default function RoomsView({
         if (expandedRoomId === room.id) setExpandedRoomId(null);
         setActiveRoomId(null);
         setActiveScreen('main');
-        setStatusNotice(`${room.roomNumber} has been deleted.`);
         setConfirmDialog(null);
       },
     });
@@ -1059,7 +703,7 @@ export default function RoomsView({
         <Text style={styles.inputLabel}>Name *</Text>
         <TextInput
           style={styles.inputField}
-          placeholder={isPrimary ? 'e.g. Rahul Sharma' : 'e.g. Neha Sharma'}
+          placeholder={isPrimary ? 'Enter resident name' : 'Enter co-occupant name'}
           placeholderTextColor={Palette.textMuted}
           value={draft.name}
           onChangeText={(text) => updateMemberDraft(memberIndex, { name: text })}
@@ -1068,7 +712,7 @@ export default function RoomsView({
         <Text style={styles.inputLabel}>Contact Number *</Text>
         <TextInput
           style={styles.inputField}
-          placeholder="e.g. +91 98765 43210"
+          placeholder="Enter contact number"
           placeholderTextColor={Palette.textMuted}
           keyboardType="phone-pad"
           value={draft.phone}
@@ -1732,7 +1376,7 @@ export default function RoomsView({
                             <Svg width={donutSize} height={donutSize} viewBox={`0 0 ${donutSize} ${donutSize}`}>
                               <Defs>
                                 <LinearGradient id="occupancyDonutGrad" x1="0" y1="0" x2="1" y2="1">
-                                  <Stop offset="0%" stopColor="#7928CA" />
+                                  <Stop offset="0%" stopColor={Palette.secondary} />
                                   <Stop offset="100%" stopColor={Palette.primary} />
                                 </LinearGradient>
                               </Defs>
@@ -1740,7 +1384,7 @@ export default function RoomsView({
                                 cx={donutSize / 2}
                                 cy={donutSize / 2}
                                 r={donutRadius}
-                                stroke="#EDE7F6"
+                                stroke={Palette.border}
                                 strokeWidth={donutStrokeWidth}
                                 fill="none"
                               />

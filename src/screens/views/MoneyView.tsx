@@ -514,9 +514,7 @@ export default function MoneyView({ onBack }: MoneyViewProps) {
                 style={styles.confirmDeleteBtn}
                 onPress={() => {
                   if (confirmDeleteTx) {
-                    const label = `${confirmDeleteTx.title} (${confirmDeleteTx.amount})`;
                     void removeTransaction(confirmDeleteTx.id);
-                    setStatusNotice(`Removed ${label}.`);
                   }
                   setConfirmDeleteTx(null);
                 }}

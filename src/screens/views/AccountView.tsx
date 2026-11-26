@@ -15,13 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword,
-  updateProfile,
-} from 'firebase/auth';
-import { auth, getFirebaseAuthErrorMessage } from '../../config/firebase';
+import { supabase, getSupabaseAuthErrorMessage } from '../../config/supabase';
 import { Palette, Radius, Typography } from '../../constants/theme';
 import { useAppData } from '../../context/AppDataContext';
 
@@ -103,8 +97,8 @@ function ProfileModalSheet({
 export default function ProfileView({ onBack, onLogout, userEmail, userName }: ProfileViewProps) {
   const { profile, updateProfile: saveProfileToDb, refreshWorkspace } = useAppData();
 
-  const fullName = profile.fullName || userName || 'Rajesh Sharma';
-  const email = profile.email || userEmail || 'owner@luvora.com';
+  const fullName = profile.fullName || userName || 'Property Owner';
+  const email = profile.email || userEmail || '';
   const phone = profile.phone;
   const propertyName = profile.propertyName;
   const bankName = profile.bankName;
@@ -165,13 +159,12 @@ export default function ProfileView({ onBack, onLogout, userEmail, userName }: P
       return;
     }
     const nextName = draftName.trim();
-    if (auth.currentUser && nextName !== auth.currentUser.displayName) {
-      try {
-        await updateProfile(auth.currentUser, { displayName: nextName });
-      } catch (error) {
-        setModalError(getFirebaseAuthErrorMessage(error, 'Could not update profile name.'));
-        return;
-      }
+    try {
+      await supabase.auth.updateUser({
+        data: { displayName: nextName, full_name: nextName },
+      });
+    } catch {
+      // Non-fatal if offline
     }
     setModalError(null);
     setShowEditProfile(false);
@@ -232,21 +225,25 @@ export default function ProfileView({ onBack, onLogout, userEmail, userName }: P
       return;
     }
 
-    const user = auth.currentUser;
-    if (!user || !user.email) {
-      setModalError('No signed-in email account found.');
-      return;
-    }
-
     setModalError(null);
     setIsUpdatingPassword(true);
     try {
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, newPassword);
+      const { data: userData } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+      if (email) {
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email,
+          password: currentPassword,
+        });
+        if (signInErr) throw signInErr;
+      }
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateErr) throw updateErr;
       setShowChangePassword(false);
     } catch (error) {
-      setModalError(getFirebaseAuthErrorMessage(error, 'Could not update password.'));
+      setModalError(getSupabaseAuthErrorMessage(error, 'Could not update password.'));
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -565,7 +562,7 @@ export default function ProfileView({ onBack, onLogout, userEmail, userName }: P
           style={styles.inputField}
           value={draftIfsc}
           onChangeText={setDraftIfsc}
-          placeholder="e.g. HDFC0001234"
+          placeholder="Enter bank IFSC code"
           placeholderTextColor={Palette.textMuted}
           autoCapitalize="characters"
         />

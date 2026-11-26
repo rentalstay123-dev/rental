@@ -11,6 +11,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Print from 'expo-print';
@@ -19,6 +20,8 @@ import { Palette, Radius, Typography } from '../../constants/theme';
 import { useCustomerData } from '../../context/CustomerDataContext';
 import type { PaymentMode, PaymentRecord, RentFilter } from '../../types/appData';
 import { formatRupeeAmount, MONTHS_FULL, parseRupeeAmount } from '../../utils/finance';
+
+const ACCOUNTS_CARD_BG = require('../../../assets/accounts-card-bg.jpg');
 
 interface CustomerPaymentsViewProps {
   onBack?: () => void;
@@ -223,90 +226,90 @@ export default function CustomerPaymentsView({
             <Text style={styles.headerTitle}>Payments</Text>
           </View>
 
-          {/* Current Month Rent Summary Card */}
+          {/* Current Month Rent Summary Card matching Admin style */}
           <View style={styles.summaryCard}>
-            <View style={styles.summaryTopRow}>
-              <View>
-                <Text style={styles.summaryOverline}>
-                  {currentMonthName.toUpperCase()} RENT BILL
-                </Text>
-                <Text style={styles.summaryAmount}>
-                  {isDue ? formatRupeeAmount(totalDueNum) : '₹0 due'}
-                </Text>
+            <Image
+              source={ACCOUNTS_CARD_BG}
+              style={styles.summaryCardBgImage}
+              resizeMode="stretch"
+            />
+            <View style={styles.summaryCardContent}>
+              <View style={styles.summaryTopRow}>
+                <View>
+                  <Text style={styles.summaryOverline}>
+                    {currentMonthName.toUpperCase()} RENT BILL
+                  </Text>
+                  <Text style={styles.summaryAmount}>
+                    {isDue ? formatRupeeAmount(totalDueNum) : '₹0 due'}
+                  </Text>
+                </View>
+                <View style={styles.statusBadge}>
+                  <Text style={[styles.statusBadgeText, { color: rentStatusColors.text }]}>
+                    {rentMeta.statusBadgeText}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.statusBadge}>
-                <Text style={[styles.statusBadgeText, { color: rentStatusColors.text }]}>
-                  {rentMeta.statusBadgeText}
-                </Text>
-              </View>
-            </View>
 
-            <View style={styles.breakdownBox}>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Base Monthly Rent</Text>
-                <Text style={styles.breakdownVal}>{room.monthlyRent}</Text>
-              </View>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Maintenance Charges</Text>
-                <Text style={styles.breakdownVal}>{rentMeta.maintenanceAmount}</Text>
-              </View>
-              {advanceNum > 0 ? (
+              <View style={styles.breakdownBox}>
                 <View style={styles.breakdownRow}>
-                  <Text style={styles.breakdownLabel}>Advance Credit</Text>
-                  <Text style={[styles.breakdownVal, { color: Palette.status.paid.text }]}>
-                    -{rentMeta.advancePayment}
-                  </Text>
+                  <Text style={styles.breakdownLabel}>Base Monthly Rent</Text>
+                  <Text style={styles.breakdownVal}>{room.monthlyRent}</Text>
                 </View>
-              ) : null}
-              <View style={styles.divider} />
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownTotalLabel}>Next / Current Due Date</Text>
-                <Text style={styles.breakdownTotalVal}>{rentMeta.dueDate}</Text>
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownLabel}>Maintenance Charges</Text>
+                  <Text style={styles.breakdownVal}>{rentMeta.maintenanceAmount}</Text>
+                </View>
+                {advanceNum > 0 ? (
+                  <View style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>Advance Credit</Text>
+                    <Text style={[styles.breakdownVal, { color: Palette.status.paid.text }]}>
+                      -{rentMeta.advancePayment}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={styles.divider} />
+                <View style={styles.breakdownRow}>
+                  <Text style={styles.breakdownTotalLabel}>Next / Current Due Date</Text>
+                  <Text style={styles.breakdownTotalVal}>{rentMeta.dueDate}</Text>
+                </View>
               </View>
-            </View>
 
-            {isDue ? (
-              <TouchableOpacity
-                style={styles.payNowButton}
-                activeOpacity={0.85}
-                onPress={openPayRentModal}
-              >
-                <Feather name="credit-card" size={16} color={Palette.onPrimary} />
-                <Text style={styles.payNowButtonText}>
-                  Pay {formatRupeeAmount(totalDueNum)} Now
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.clearRentSection}>
-                <View style={styles.paidNoteRow}>
-                  <Feather name="check-circle" size={15} color={Palette.status.paid.text} />
-                  <Text style={styles.paidNoteText}>
-                    All dues cleared. Next bill cycles on {rentMeta.dueDate}.
-                  </Text>
-                </View>
-
+              {isDue ? (
                 <TouchableOpacity
-                  style={styles.payAdvanceButton}
+                  style={styles.payNowButton}
                   activeOpacity={0.85}
-                  onPress={openPayAdvanceModal}
+                  onPress={openPayRentModal}
                 >
-                  <Feather name="credit-card" size={15} color={Palette.onPrimary} />
-                  <Text style={styles.payAdvanceButtonText}>Advance Pay</Text>
+                  <Feather name="credit-card" size={16} color={Palette.onPrimary} />
+                  <Text style={styles.payNowButtonText}>
+                    Pay {formatRupeeAmount(totalDueNum)} Now
+                  </Text>
                 </TouchableOpacity>
-              </View>
-            )}
+              ) : (
+                <View style={styles.clearRentSection}>
+                  <View style={styles.paidNoteRow}>
+                    <Feather name="check-circle" size={15} color={Palette.status.paid.text} />
+                    <Text style={styles.paidNoteText}>
+                      All dues cleared. Next bill cycles on {rentMeta.dueDate}.
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.payAdvanceButton}
+                    activeOpacity={0.85}
+                    onPress={openPayAdvanceModal}
+                  >
+                    <Feather name="credit-card" size={15} color={Palette.onPrimary} />
+                    <Text style={styles.payAdvanceButtonText}>Advance Pay</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Security Deposit Card */}
           <View style={styles.depositCard}>
             <View style={styles.depositTopRow}>
-              <View style={styles.depositIconCol}>
-                <Feather
-                  name={isDepositPaid ? 'lock' : 'shield'}
-                  size={18}
-                  color={isDepositPaid ? Palette.primary : Palette.status.due.text}
-                />
-              </View>
               <View style={styles.depositTextCol}>
                 <Text style={styles.depositTitle}>Security Deposit</Text>
                 <Text style={styles.depositSub}>
@@ -734,18 +737,32 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: 20,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
   },
   summaryCard: {
     backgroundColor: Palette.surface,
-    borderRadius: 5,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Palette.border,
-    padding: 18,
     marginBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  summaryCardBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  summaryCardContent: {
+    width: '100%',
+    padding: 18,
   },
   summaryTopRow: {
     flexDirection: 'row',
@@ -753,13 +770,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   summaryOverline: {
-    fontSize: Typography.fontSize.caption,
+    fontSize: 10,
     fontWeight: '700',
     color: Palette.accentText,
     letterSpacing: 0.7,
   },
   summaryAmount: {
-    fontSize: Typography.fontSize.hero,
+    fontSize: 18,
     fontWeight: '800',
     color: Palette.primary,
     marginTop: 4,
@@ -769,14 +786,14 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   statusBadgeText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 12,
     fontWeight: '700',
   },
   breakdownBox: {
-    backgroundColor: Palette.tint,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
     borderWidth: 1,
     borderColor: Palette.border,
-    borderRadius: 5,
+    borderRadius: 8,
     padding: 12,
     marginTop: 14,
   },
@@ -787,21 +804,21 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   breakdownLabel: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     color: Palette.textSecondary,
   },
   breakdownVal: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     fontWeight: '700',
     color: Palette.text,
   },
   breakdownTotalLabel: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 12,
     fontWeight: '700',
     color: Palette.text,
   },
   breakdownTotalVal: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 12,
     fontWeight: '800',
     color: Palette.primary,
   },
@@ -826,7 +843,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   paidNoteText: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 10,
     color: Palette.status.paid.text,
     fontWeight: '600',
   },
@@ -845,12 +862,12 @@ const styles = StyleSheet.create({
   },
   payAdvanceButtonText: {
     color: Palette.onPrimary,
-    fontSize: Typography.fontSize.base,
+    fontSize: 12,
     fontWeight: '700',
   },
   depositCard: {
     backgroundColor: Palette.surface,
-    borderRadius: 5,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: Palette.border,
     padding: 16,
@@ -860,25 +877,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  depositIconCol: {
-    width: 38,
-    height: 38,
-    borderRadius: Radius.pill,
-    backgroundColor: Palette.iconBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
   depositTextCol: {
     flex: 1,
   },
   depositTitle: {
-    fontSize: Typography.fontSize.md,
+    fontSize: 14,
     fontWeight: '700',
     color: Palette.text,
   },
   depositSub: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     color: Palette.textSecondary,
     marginTop: 2,
   },
@@ -887,7 +895,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   depositAmount: {
-    fontSize: Typography.fontSize.md,
+    fontSize: 14,
     fontWeight: '800',
     color: Palette.primary,
   },
@@ -908,7 +916,7 @@ const styles = StyleSheet.create({
   },
   payDepositButtonText: {
     color: Palette.onPrimary,
-    fontSize: Typography.fontSize.sm,
+    fontSize:12,
     fontWeight: '700',
   },
   miniBadge: {
@@ -926,7 +934,7 @@ const styles = StyleSheet.create({
   filterChip: {
     paddingHorizontal: 16,
     paddingVertical: 7,
-    borderRadius: Radius.pill,
+    borderRadius: 5,
     backgroundColor: Palette.surface,
     borderWidth: 1,
     borderColor: Palette.border,
@@ -936,7 +944,7 @@ const styles = StyleSheet.create({
     borderColor: Palette.primary,
   },
   filterChipText: {
-    fontSize: Typography.fontSize.sm,
+    fontSize: 11,
     fontWeight: '600',
     color: Palette.text,
   },
@@ -944,7 +952,7 @@ const styles = StyleSheet.create({
     color: Palette.onPrimary,
   },
   sectionTitle: {
-    fontSize: Typography.fontSize.lg,
+    fontSize: 18,
     fontWeight: '800',
     color: Palette.text,
     marginBottom: 12,
@@ -975,13 +983,13 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   ledgerTitle: {
-    fontSize: Typography.fontSize.base,
+    fontSize: 14,
     fontWeight: '700',
     color: Palette.text,
     flexShrink: 1,
   },
   ledgerSub: {
-    fontSize: Typography.fontSize.xs,
+    fontSize: 11,
     color: Palette.textSecondary,
   },
   ledgerRightCol: {
@@ -990,7 +998,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   ledgerAmount: {
-    fontSize: Typography.fontSize.md,
+    fontSize: 14,
     fontWeight: '800',
     color: Palette.primary,
   },

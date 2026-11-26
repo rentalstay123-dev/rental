@@ -24,12 +24,17 @@ import type {
 
 interface RequestsViewProps {
   initialRequestId?: string;
+  initialOpenCreateModal?: boolean;
   onBack?: () => void;
 }
 
 type RequestFilter = 'All' | 'Open' | 'In Progress' | 'Resolved';
 
-export default function RequestsView({ initialRequestId, onBack }: RequestsViewProps) {
+export default function RequestsView({
+  initialRequestId,
+  initialOpenCreateModal = false,
+  onBack,
+}: RequestsViewProps) {
   const {
     notifications,
     rooms,
@@ -45,7 +50,7 @@ export default function RequestsView({ initialRequestId, onBack }: RequestsViewP
   const [selectedRequestId, setSelectedRequestId] = useState<string | undefined>(initialRequestId);
 
   // New Request Modal State
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(() => Boolean(initialOpenCreateModal));
   const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false);
   const [selectedRooms, setSelectedRooms] = useState<string[]>(['All']);
   const [roomSearchQuery, setRoomSearchQuery] = useState('');
@@ -497,8 +502,8 @@ export default function RequestsView({ initialRequestId, onBack }: RequestsViewP
                         onPress={() => void handleUpdateStatus(item.id, 'In Progress')}
                         activeOpacity={0.7}
                       >
-                        <Feather name="play" size={Typography.iconSize.sm} color="#1E40AF" style={{ marginRight: 4 }} />
-                        <Text style={[styles.actionChipText, { color: '#1E40AF' }]}>Start</Text>
+                        <Feather name="play" size={Typography.iconSize.sm} color={Palette.primary} style={{ marginRight: 4 }} />
+                        <Text style={[styles.actionChipText, { color: Palette.primary }]}>Start</Text>
                       </TouchableOpacity>
                     ) : reqStatus === 'In Progress' ? (
                       <TouchableOpacity
@@ -506,8 +511,8 @@ export default function RequestsView({ initialRequestId, onBack }: RequestsViewP
                         onPress={() => void handleUpdateStatus(item.id, 'Resolved')}
                         activeOpacity={0.7}
                       >
-                        <Feather name="check" size={Typography.iconSize.sm} color="#315B32" style={{ marginRight: 4 }} />
-                        <Text style={[styles.actionChipText, { color: '#315B32' }]}>Resolve</Text>
+                        <Feather name="check" size={Typography.iconSize.sm} color={Palette.status.paid.text} style={{ marginRight: 4 }} />
+                        <Text style={[styles.actionChipText, { color: Palette.status.paid.text }]}>Resolve</Text>
                       </TouchableOpacity>
                     ) : null}
 
@@ -1287,7 +1292,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   headerTitle: {
-    fontSize: Typography.fontSize.xxl,
+    fontSize: 20,
     fontWeight: '800',
     color: Palette.text,
     letterSpacing: -0.3,
@@ -1426,17 +1431,17 @@ const styles = StyleSheet.create({
     color: Palette.textMuted,
   },
   priorityBadgeUrgent: {
-    backgroundColor: '#F9DEDC',
+    backgroundColor: Palette.status.overdue.bg,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 0.5,
-    borderColor: '#A52A25',
+    borderColor: Palette.status.overdue.text,
   },
   priorityBadgeText: {
     fontSize: 9.5,
     fontWeight: '700',
-    color: '#A52A25',
+    color: Palette.status.overdue.text,
     textTransform: 'uppercase',
   },
   statusMiniBadge: {
@@ -1445,10 +1450,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   statusBadgeOpen: {
-    backgroundColor: '#FCE9C9',
+    backgroundColor: Palette.status.due.bg,
   },
   statusBadgeProgress: {
-    backgroundColor: '#EBF3FE',
+    backgroundColor: Palette.iconBg,
   },
   statusBadgeResolved: {
     backgroundColor: 'transparent',
@@ -1460,13 +1465,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statusTextOpen: {
-    color: '#80500D',
+    color: Palette.status.due.text,
   },
   statusTextProgress: {
-    color: '#1E40AF',
+    color: Palette.primary,
   },
   statusTextResolved: {
-    color: '#315B32',
+    color: Palette.status.paid.text,
   },
   noticeMessage: {
     fontSize: Typography.fontSize.caption,
@@ -1833,7 +1838,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   priorityUrgent: {
-    backgroundColor: '#F9DEDC',
+    backgroundColor: Palette.status.overdue.bg,
   },
   priorityNormal: {
     backgroundColor: Palette.iconBg,
@@ -1843,7 +1848,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   priorityUrgentText: {
-    color: '#A52A25',
+    color: Palette.status.overdue.text,
   },
   priorityNormalText: {
     color: Palette.primary,
@@ -1876,16 +1881,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusOpenActive: {
-    backgroundColor: '#FCE9C9',
-    borderColor: '#80500D',
+    backgroundColor: Palette.status.due.bg,
+    borderColor: Palette.status.due.text,
   },
   statusProgressActive: {
-    backgroundColor: '#EBF3FE',
-    borderColor: '#1E40AF',
+    backgroundColor: Palette.iconBg,
+    borderColor: Palette.primary,
   },
   statusResolvedActive: {
-    backgroundColor: '#E5F0DF',
-    borderColor: '#315B32',
+    backgroundColor: Palette.status.paid.bg,
+    borderColor: Palette.status.paid.text,
   },
   statusToggleText: {
     fontSize: Typography.fontSize.xs,
@@ -1893,15 +1898,15 @@ const styles = StyleSheet.create({
     color: Palette.textSecondary,
   },
   statusOpenTextActive: {
-    color: '#80500D',
+    color: Palette.status.due.text,
     fontWeight: '700',
   },
   statusProgressTextActive: {
-    color: '#1E40AF',
+    color: Palette.primary,
     fontWeight: '700',
   },
   statusResolvedTextActive: {
-    color: '#315B32',
+    color: Palette.status.paid.text,
     fontWeight: '700',
   },
   categoriesWrap: {

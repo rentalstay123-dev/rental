@@ -97,7 +97,6 @@ export default function StaffView({ onBack }: StaffViewProps) {
     upsertStaff,
     removeStaff,
     payStaffSalary,
-    loadSampleStaff,
     refreshWorkspace,
   } = useAppData();
 
@@ -168,8 +167,6 @@ export default function StaffView({ onBack }: StaffViewProps) {
   const [deletingStaff, setDeletingStaff] = useState<StaffMember | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const [isLoadingSample, setIsLoadingSample] = useState(false);
 
   const stats = useMemo(() => {
     let activeCount = 0;
@@ -381,24 +378,6 @@ export default function StaffView({ onBack }: StaffViewProps) {
       setDeleteError('Unable to delete this staff member. Please try again.');
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const handleLoadSample = async () => {
-    setIsLoadingSample(true);
-    try {
-      await loadSampleStaff();
-      setNotice({
-        tone: 'success',
-        message: 'Sample staff profiles loaded into your directory.',
-      });
-    } catch {
-      setNotice({
-        tone: 'error',
-        message: 'Unable to load sample staff right now. Please try again.',
-      });
-    } finally {
-      setIsLoadingSample(false);
     }
   };
 
@@ -682,16 +661,7 @@ export default function StaffView({ onBack }: StaffViewProps) {
                   style={styles.emptyPrimaryBtn}
                   onPress={openAddModal}
                 >
-                  <Text style={styles.emptyPrimaryBtnText}>Add Staff</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.emptySecondaryBtn}
-                  onPress={handleLoadSample}
-                  disabled={isLoadingSample}
-                >
-                  <Text style={styles.emptySecondaryBtnText}>
-                    {isLoadingSample ? 'Loading...' : 'Load Sample Staff'}
-                  </Text>
+                  <Text style={styles.emptyPrimaryBtnText}>Add Staff Member</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -912,7 +882,7 @@ export default function StaffView({ onBack }: StaffViewProps) {
               <Text style={styles.fieldLabel}>Full Name *</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. Ramesh Naik"
+                placeholder="Enter staff full name"
                 placeholderTextColor={Palette.textMuted}
                 value={formState.name}
                 onChangeText={(value) =>
@@ -1047,7 +1017,7 @@ export default function StaffView({ onBack }: StaffViewProps) {
               <Text style={styles.fieldLabel}>Phone Number *</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g. +91 98765 43210"
+                placeholder="Enter contact phone number"
                 placeholderTextColor={Palette.textMuted}
                 keyboardType="phone-pad"
                 value={formState.phone}
