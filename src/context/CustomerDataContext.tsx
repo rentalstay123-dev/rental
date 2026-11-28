@@ -133,6 +133,12 @@ export function CustomerDataProvider({
     let isMounted = true;
     let unsub: (() => void) | undefined;
 
+    const depositIsUnpaid = (deposit?: CustomerWorkspaceData['deposit']) => {
+      if (!deposit) return false;
+      const status = String(deposit.status || '').toLowerCase();
+      return status !== 'held' && status !== 'paid';
+    };
+
     const bootstrap = async () => {
       const resetKey = `@luvora_deposit_unpaid_test_v1_${uid}`;
       const needsDepositUnpay = !(await AsyncStorage.getItem(resetKey).catch(() => null));
@@ -142,7 +148,7 @@ export function CustomerDataProvider({
         if (cachedRaw && isMounted) {
           const parsed = JSON.parse(cachedRaw) as CustomerWorkspaceData;
           if (parsed?.room && parsed?.profile) {
-            if (needsDepositUnpay && parsed.deposit) {
+            if (needsDepositUnpay && depositIsUnpaid(parsed.deposit)) {
               parsed.deposit = {
                 ...parsed.deposit,
                 status: 'Due',
@@ -183,7 +189,7 @@ export function CustomerDataProvider({
           fullName: userName,
         });
         if (isMounted) {
-          if (needsDepositUnpay && initialized.deposit) {
+          if (needsDepositUnpay && depositIsUnpaid(initialized.deposit)) {
             initialized.deposit = {
               ...initialized.deposit,
               status: 'Due',

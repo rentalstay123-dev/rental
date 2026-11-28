@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase, getSupabaseAuthErrorMessage } from './src/config/supabase';
-import { fetchUserRole, purgeLegacyMockStorage, saveUserRole } from './src/services/supabaseService';
+import { fetchUserRole, purgeLegacyMockStorage } from './src/services/supabaseService';
 import type { UserRole } from './src/types/appData';
 import LoadingScreen from './src/screens/LoadingScreen';
 import LoginScreen from './src/screens/LoginScreen';
@@ -52,48 +52,32 @@ export default function App() {
         const uid = supabaseUser.id;
         const resolveUserRole = async () => {
           await purgeLegacyMockStorage();
-          const rawRole = supabaseUser.user_metadata?.role as string | undefined;
-          let metaRole: UserRole | undefined;
-          if (rawRole === 'admin' || rawRole === 'owner') metaRole = 'owner';
-          else if (rawRole === 'customer') metaRole = 'customer';
-
-          let resolvedRole: UserRole = metaRole ?? 'owner';
-          if (!metaRole) {
-            try {
-              const remoteRole = await fetchUserRole(uid);
-              if (remoteRole) {
-                resolvedRole = remoteRole === 'admin' ? 'owner' : remoteRole;
-                await AsyncStorage.setItem(`@luvora_role_${uid}`, resolvedRole);
-              } else {
-                const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
-                if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
-                  resolvedRole = cached === 'admin' ? 'owner' : cached;
-                }
-              }
-            } catch {
-              try {
-                const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
-                if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
-                  resolvedRole = cached === 'admin' ? 'owner' : cached;
-                }
-              } catch {
-                // Default to owner when offline and uncached
+          let resolvedRole: UserRole = 'owner';
+          try {
+            const remoteRole = await fetchUserRole(uid);
+            if (remoteRole) {
+              resolvedRole = remoteRole === 'admin' ? 'owner' : remoteRole;
+            } else {
+              const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
+              if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
+                resolvedRole = cached === 'admin' ? 'owner' : cached;
               }
             }
-
-            // Auto-set: If the role was not in Supabase user metadata, persist it now!
+          } catch {
             try {
-              await saveUserRole(uid, resolvedRole);
+              const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
+              if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
+                resolvedRole = cached === 'admin' ? 'owner' : cached;
+              }
             } catch {
-              // Non-fatal
+              resolvedRole = 'owner';
             }
           }
 
           if (authHoldRef.current || isCancelled) return;
 
           const override = explicitRoleRef.current;
-          const finalRole =
-            metaRole ?? (override && override.uid === uid ? override.role : resolvedRole);
+          const finalRole = override && override.uid === uid ? override.role : resolvedRole;
 
           const metadataName =
             (supabaseUser.user_metadata?.displayName as string | undefined) ||

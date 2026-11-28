@@ -21,7 +21,6 @@ import {
   fetchUserRole,
   initializeCustomerProfile,
   initializeRegisteredUserProfile,
-  saveUserRole,
 } from '../services/supabaseService';
 import type { UserRole } from '../types/appData';
 import LuvoraLogo from '../components/LuvoraLogo';
@@ -72,7 +71,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
     } catch {
       // Ignore storage read errors
     }
-    return 'owner';
+    throw new Error('Your account role is not available. Please contact support.');
   };
 
   const handleSignIn = async () => {
@@ -102,24 +101,7 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
       }
 
       const uid = data.user.id;
-      const rawRole = data.user.user_metadata?.role as string | undefined;
-      const metadataRole: UserRole | undefined =
-        rawRole === 'admin'
-          ? 'owner'
-          : rawRole === 'customer' || rawRole === 'owner'
-          ? rawRole
-          : undefined;
-
-      const finalRole = metadataRole ?? (await resolveAccountRole(uid));
-
-      // Auto-set: If role is not yet stored in Supabase or metadata, set it now
-      if (!rawRole) {
-        try {
-          await saveUserRole(uid, finalRole);
-        } catch {
-          // Ignore
-        }
-      }
+      const finalRole = await resolveAccountRole(uid);
 
       try {
         await AsyncStorage.setItem(`@luvora_role_${uid}`, finalRole);
@@ -240,31 +222,24 @@ export default function LoginScreen({ onAuthHoldChange, onLoginSuccess }: LoginS
         throw new Error('Registration failed. Please check your credentials.');
       }
 
-      const uid = user.id;
-
-      try {
-        await saveUserRole(uid, regRole);
-      } catch {
-        // Ignore local cache write error
+      if (!data.session) {
+        throw new Error('Registration succeeded, but email confirmation is required before you can sign in.');
       }
-      try {
-        if (regRole === 'customer') {
-          await initializeCustomerProfile(uid, {
-            email: user.email ?? trimmedEmail,
-            fullName: trimmedName,
-            roomNumber: regRoomNumber.trim(),
-            propertyName: regProperty.trim(),
-          });
-        } else {
-          await initializeRegisteredUserProfile(uid, {
-            email: user.email ?? trimmedEmail,
-            fullName: trimmedName,
-            propertyName: regProperty.trim(),
-          });
-          await saveUserRole(uid, 'owner');
-        }
-      } catch {
-        // Non-fatal
+
+      const uid = user.id;
+      if (regRole === 'customer') {
+        await initializeCustomerProfile(uid, {
+          email: user.email ?? trimmedEmail,
+          fullName: trimmedName,
+          roomNumber: regRoomNumber.trim(),
+          propertyName: regProperty.trim(),
+        });
+      } else {
+        await initializeRegisteredUserProfile(uid, {
+          email: user.email ?? trimmedEmail,
+          fullName: trimmedName,
+          propertyName: regProperty.trim(),
+        });
       }
       setIsRegisterModalVisible(false);
       onLoginSuccess?.({

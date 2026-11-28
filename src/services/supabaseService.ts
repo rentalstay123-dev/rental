@@ -339,17 +339,8 @@ export async function initializeRegisteredUserProfile(
 
   await persistOwnerLocalCache(uid, updatedRow);
 
-  try {
-    await supabase.from('user_roles').upsert({
-      user_id: uid,
-      role: 'owner',
-      updated_at: new Date().toISOString(),
-    });
-
-    await supabase.from('workspaces').upsert(stripUndefined(updatedRow));
-  } catch {
-    // Supabase push failed or table not created yet; cached locally.
-  }
+  const { error } = await supabase.from('workspaces').upsert(stripUndefined(updatedRow));
+  if (error) throw error;
 }
 
 /** Seeds initial owner workspace data into Supabase / local cache. */
@@ -383,12 +374,6 @@ export async function ensureUserWorkspaceInitialized(
   await persistOwnerLocalCache(uid, newRow);
 
   try {
-    await supabase.from('user_roles').upsert({
-      user_id: uid,
-      role: 'owner',
-      updated_at: new Date().toISOString(),
-    });
-
     const { error: insertErr } = await supabase.from('workspaces').upsert(stripUndefined(newRow));
     if (insertErr) {
       console.warn('[Supabase] Initial workspace upsert error:', insertErr.message);
@@ -405,8 +390,15 @@ export function subscribeUserWorkspace(
   callbacks: WorkspaceCallbacks
 ): () => void {
   let isCancelled = false;
+  let lastRow: OwnerWorkspaceRow | null = null;
 
-  const emitRow = (row: OwnerWorkspaceRow) => {
+  const emitRow = (incoming: OwnerWorkspaceRow) => {
+    const row: OwnerWorkspaceRow = lastRow
+      ? ({ ...lastRow, ...stripUndefined(incoming) } as OwnerWorkspaceRow)
+      : incoming;
+    row.profile = row.profile || DEFAULT_OWNER_PROFILE;
+    row.settings = row.settings || DEFAULT_WORKSPACE_SETTINGS;
+    lastRow = row;
     callbacks.onWorkspaceDoc(row.profile, row.settings);
     callbacks.onRooms(row.rooms || []);
     callbacks.onRentMeta(row.rent_records || {});
@@ -817,80 +809,33 @@ export async function clearWorkspaceRecords(uid: string): Promise<void> {
 
 export async function saveUserRole(uid: string, role: UserRole): Promise<void> {
   const normalizedRole: 'owner' | 'customer' = role === 'admin' ? 'owner' : role;
-  try {
-    await AsyncStorage.setItem(`@luvora_role_${uid}`, normalizedRole);
-    await supabase.from('user_roles').upsert({
-      user_id: uid,
-      role: normalizedRole,
-      updated_at: new Date().toISOString(),
-    });
-    // Ensure Supabase Auth user_metadata also has the role persisted
-    await supabase.auth.updateUser({
-      data: { role: normalizedRole },
-    }).catch(() => {});
-  } catch {
-    // Ignore error
-  }
+  await AsyncStorage.setItem(`@luvora_role_${uid}`, normalizedRole);
 }
 
 export async function fetchUserRole(uid: string): Promise<UserRole | null> {
-  // 1. Try local cache
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', uid)
+      .maybeSingle();
+
+    if (!error && data?.role && ['owner', 'customer', 'admin'].includes(data.role)) {
+      const parsedRole: UserRole = data.role === 'admin' ? 'owner' : (data.role as UserRole);
+      await saveUserRole(uid, parsedRole);
+      return parsedRole;
+    }
+  } catch {
+    // Use the local role cache only when the role lookup is unavailable.
+  }
+
   try {
     const cached = await AsyncStorage.getItem(`@luvora_role_${uid}`);
     if (cached === 'customer' || cached === 'owner' || cached === 'admin') {
       return cached === 'admin' ? 'owner' : (cached as UserRole);
     }
   } catch {
-    // Ignore storage read error
-  }
-
-  // 2. Query Supabase user_roles table
-  try {
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', uid)
-      .maybeSingle();
-
-    if (data?.role) {
-      const parsedRole: UserRole = data.role === 'admin' ? 'owner' : (data.role as UserRole);
-      await AsyncStorage.setItem(`@luvora_role_${uid}`, parsedRole);
-      return parsedRole;
-    }
-  } catch {
-    // Ignore network error
-  }
-
-  // 3. Check customer_workspaces table - if record exists, role is customer
-  try {
-    const { data: customerData } = await supabase
-      .from('customer_workspaces')
-      .select('user_id')
-      .eq('user_id', uid)
-      .maybeSingle();
-
-    if (customerData?.user_id) {
-      await saveUserRole(uid, 'customer');
-      return 'customer';
-    }
-  } catch {
-    // Ignore network error
-  }
-
-  // 4. Check workspaces table - if record exists, role is owner / admin
-  try {
-    const { data: ownerData } = await supabase
-      .from('workspaces')
-      .select('user_id')
-      .eq('user_id', uid)
-      .maybeSingle();
-
-    if (ownerData?.user_id) {
-      await saveUserRole(uid, 'owner');
-      return 'owner';
-    }
-  } catch {
-    // Ignore network error
+    // Ignore storage read errors
   }
 
   return null;
@@ -901,19 +846,15 @@ export async function initializeCustomerProfile(
   info: { email: string; fullName?: string; roomNumber?: string; propertyName?: string }
 ): Promise<CustomerWorkspaceData> {
   const initialData = createInitialCustomerData(info);
-  await saveUserRole(uid, 'customer');
   await persistCustomerLocalCache(uid, initialData);
 
-  try {
-    await supabase.from('customer_workspaces').upsert({
-      user_id: uid,
-      workspace_data: stripUndefined(initialData),
-      initialized: true,
-      updated_at: new Date().toISOString(),
-    });
-  } catch {
-    // Offline or table not present
-  }
+  const { error } = await supabase.from('customer_workspaces').upsert({
+    user_id: uid,
+    workspace_data: stripUndefined(initialData),
+    initialized: true,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
 
   return initialData;
 }
@@ -1054,14 +995,11 @@ export async function saveCustomerWorkspace(
   data: CustomerWorkspaceData
 ): Promise<void> {
   await persistCustomerLocalCache(uid, data);
-  try {
-    await supabase.from('customer_workspaces').upsert({
-      user_id: uid,
-      workspace_data: stripUndefined(data),
-      initialized: true,
-      updated_at: new Date().toISOString(),
-    });
-  } catch {
-    // Offline or table not present
-  }
+  const { error } = await supabase.from('customer_workspaces').upsert({
+    user_id: uid,
+    workspace_data: stripUndefined(data),
+    initialized: true,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw error;
 }
