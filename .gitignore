@@ -41,3 +41,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# local dev/stress tooling (not committed)
+scripts/
