@@ -14,7 +14,7 @@ interface LoadingScreenProps {
   duration?: number;
 }
 
-export default function LoadingScreen({ onFinish, duration = 2400 }: LoadingScreenProps) {
+export default function LoadingScreen({ onFinish, duration = 900 }: LoadingScreenProps) {
   // Animation values
   const [logoOpacity] = useState(() => new Animated.Value(0));
   const [logoScale] = useState(() => new Animated.Value(0.92));

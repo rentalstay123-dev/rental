@@ -18,6 +18,8 @@ interface AuthenticatedUser {
   role: UserRole;
 }
 
+const SPLASH_MIN_MS = 900;
+
 export default function App() {
   const [isSplashDone, setIsSplashDone] = useState(false);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -102,8 +104,9 @@ export default function App() {
     };
   }, []);
 
-  const handleSplashFinish = useCallback(() => {
-    setIsSplashDone(true);
+  useEffect(() => {
+    const splashTimer = setTimeout(() => setIsSplashDone(true), SPLASH_MIN_MS);
+    return () => clearTimeout(splashTimer);
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -124,7 +127,7 @@ export default function App() {
     return (
       <SafeAreaProvider>
         <StatusBar style="dark" />
-        <LoadingScreen onFinish={handleSplashFinish} />
+        <LoadingScreen />
       </SafeAreaProvider>
     );
   }
